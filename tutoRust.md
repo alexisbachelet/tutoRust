@@ -185,15 +185,15 @@ Only work on a inner scope "{}"!
 * Modulo with `%`
 * `''` for `char`acter and `""` for string
 * Snake case convention: `my_fct`
-* statement: are actions like assignation (not return value) `let x = 3`
-* expression: evaluate to a value `2 + 3` or `8` are statements
-* Add a semicolon to the end of an expression, you turn it into a statement
+* **statement:** are actions like assignation (not return value) `let x = 3`
+* **expression:** evaluate to a value `2 + 3` or `8` are expressions
+* Add a semicolon to the end of an expression turn it into a statement
 
-### Compund
+### Compound Types
 
 ```rust
 let myTuple: (u32, i8, f64) = (500, -20, 2.3);
-let (x, y, z) = tup;  // destructuring a tuple into three variables.
+let (x, y, z) = myTup;  // destructuring a tuple into three variables.
 println!("The value of y is: {y}");
 println!("The value of x is: {myTuple.0});
 ```
@@ -203,6 +203,8 @@ let myArr: [i32; 5] = [0, 1 , 2, 3, 4,  5];
 let equalArr = [1; 3]  // ";" is like a repeat [1, 1, 1].
 let first = myArr[0];
 ```
+
+### Functions
 
 ```rust
 fn main() {
@@ -217,5 +219,147 @@ fn another_function(x: i32) {
 ```rust
 fn plus_one(x: i32) -> i32 {
     x + 1  // never end with ';', because it's expression not a statement.
+}
+```
+
+### Control flow
+
+```rust
+if number % 4 == 0 {
+    ...;
+} else if number % 3 {
+    ...;
+} else {
+    ...;
+}
+```
+
+Always return the same type in a if no mater the legs.
+
+```rust
+let a = [10, 20, 30, 40, 50];
+for element in a {  //  No need to define element.
+    println!("the value is: {element}");
+}
+```
+
+## Owenership
+
+**Owenership** is a set of rules on how manage the memory.
+
+* Allow memory saftety (No compile)
+* No garbage collector (When a variable is not use it's throw)
+* Mange Heap data
+
+Two concepts stack ('pile', push) and heap ('amas', allocate):
+
+* **Stack:** The space is define
+* **Heap:** Need to find an unkwnol variable space on the memory. Generate a pointer (memory location) to be more quick when we want to acces to the varible. Like a waiter in a diner.
+
+```rust
+//  A String is made up of three parts: 
+// a pointer to the memory (Index and value)
+// a length (the actual size of the string)
+// and a capacity (The mawimum lenght tat the memoty can hold)
+let s1 = String::from("hello");
+let s2 = s1;  // s1 is pop to avoid double free error.
+```
+
+```rust
+fn main() {
+    let s1 = String::from("hello");
+    let len = calculate_length(&s1);  // S1 is not poped, borowed by references.
+}
+
+fn calculate_length(s: &String) -> usize {  // ARCHitecture size (32 or 64).
+    s.len()
+}
+```
+
+**Slice** Continus sequence of elements. (".." for range). Create varibale from a part of an alreadydefined variable. So it's much suicker: no need to realy store the data again on the memory.
+
+```rust
+fn first_word(s: &String) -> &str {  // &str is a string slice
+    let bytes = s.as_bytes();
+
+    // An array of bytes (A = 64).
+    for (i, &item) in bytes.iter().enumerate() {
+        if item == b' ' {
+            return &s[0..i];
+        }
+    }
+
+    &s[..]
+}
+
+fn main() {
+    let mut s = String::from("hello world");
+    let word = first_word(&s);
+    s.clear();  // Error, we can't clean s because word (a reference) borrow it.
+}
+```
+
+```rust
+// s is a &str type because string literal are stortered direcltly on binary.
+let s = "Hello, world!"; 
+```
+
+## Structure
+
+```rust
+struct User {
+    active: bool,
+    username: String,
+    email: String,
+    sign_in_count: u64,
+}
+
+fn build_user(email: String, username: String) -> User {
+    User {
+        active: true,
+        username,
+        email,
+        sign_in_count: 1,
+    }
+}
+```
+
+```rust
+let user2 = User {
+    email: String::from("another@example.com"),
+    ..user1  // To copy all the remain attributes.
+};
+```
+
+```rust
+struct Color(i32, i32, i32);  // Tuple struct: a struct without name attributes.
+struct AlwaysEqual;  // Unit like struct.
+
+fn main() {
+    let black = Color(0, 0, 0)
+    let subject = AlwaysEqual;
+}
+```
+
+Debug in rust:
+
+* **println!()**: Take references, output stream, print.
+* **dbg!()**: Take ownership, error stream, print and return.
+
+```rust
+#[derive(Debug)]  // # is the outer attribute.
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
+
+    println!("rect1 is {:?}", rect1);  // {:?} or {:#?} for debug print.
+    dbg!(&rect1);  // Give ref to avoid ownership.
 }
 ```
