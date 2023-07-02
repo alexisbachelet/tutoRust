@@ -363,3 +363,105 @@ fn main() {
     dbg!(&rect1);  // Give ref to avoid ownership.
 }
 ```
+
+## Enum
+
+Define a new type that is like a radio button list  
+You can choose a value only a a resticted list
+
+```rust
+enum IpAddr {
+    V4(String),
+    V6(String),
+}
+
+let home = IpAddr::V4(String::from("127.0.0.1"));
+let loopback = IpAddr::V6(String::from("::1"));
+```
+
+ Like struct we cann add method:
+
+ ```rust
+impl MyEnum {
+    fn my_Method(&self) {
+        // method body would be defined here
+    }
+}
+```
+
+There is a special enum for null value (invalid or missing):
+
+```rust
+enum Option<T> {
+    None,
+    Some(T),
+}
+
+//  Option is so common: no need to prefix with Option.   
+let some_number = Some(5);
+let absent_number: Option<i32> = None;  // Rust cano't infer None type.
+```
+
+## Match: a special if
+
+ ```rust
+ [derive(Debug)]
+ enum Coin {
+    Penny,
+    Nickel,
+    Dime(UsState),  // UsState is an another Enum.
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,  // An arm has two parts: a pattern and some code.
+        Coin::Nickel => 5,
+        Coin::Dime(Starter) => {  // Patterns That Bind to Values.
+            println!("State quarter from {:?}!", state);
+            25
+        },
+    }
+}
+````
+
+Also usefull with `Option<T>`:
+
+```rust
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        None => None,
+        Some(i) => Some(i + 1),
+    }
+}
+
+let five = Some(5);
+```
+
+The default value:Define a real variable or `_ => ()`
+
+```rust
+match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        other => move_player(other),  // other is the default, "_" to not use
+    }
+```
+
+A Shortcut:
+
+```rust
+let config_max = Some(3u8);  // Value 3 but in a u8 format.
+
+match config_max {
+    Some(max) => println!("The maximum is {}", max),
+    _ => (),
+}
+
+// Shortcut to exec the code "{}" with a variable affectation before.
+if let Some(max) = config_max {
+     println!("The maximum is {}", max);
+}
+```
+ 
+ ## Crates
+
