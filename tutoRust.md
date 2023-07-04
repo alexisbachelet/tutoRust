@@ -465,3 +465,63 @@ if let Some(max) = config_max {
  
  ## Crates
 
+### Definitions
+
+Crate: Is the main file that link to other file. Two forms:
+* Binary (main)
+* Library (sub fct)
+
+Package: Contain as many binary crates as you like, but at most only one library crate
+
+Recall to crate a packge:
+
+```bash
+$ cargo new my-project
+$ cargo new restaurant --lib
+```
+
+The main file location by default:
+
+```tree
+src/main.rs
+src/lib.rs
+```
+
+We can also create several binary create with a different name of the package
+
+```tree
+src/bin/my_bin.rs
+```
+
+In a crate we have module: there are like a section of codes  
+In module we use path to identify item location  
+
+
+To import (declare) a module code: `Mod myModule`  
+If the importation is in a main file search in a src/myModule.rs  
+If the declaration is inside a module, search in: src/myModule/mySub.rs
+
+Iteam inside a module is private from it's parent module, access is deny   
+Two things to know:
+* Use `mod my_module {}` to create (define) a private module (item not accesable)
+* Use `pub mod my_module  {}` to define a public module
+* In a PUBLIC MODULE we can also use `pub enum` to make a ITEM PUBLIC too  
+* Use `mod my_module;` to load a module for  private use (in crate module)
+* Use `pub mod my_module;` to load a module with public use. So it's possible to access item in a external ways. (in sub module)
+
+
+
+Don't need to write:
+* `crate::garden::vegetables::Asparagus`
+* `use crate::garden::vegetables::Asparagus`
+
+`crate` id the default name of the main file (the current crate)  
+Child module can access code in parent module but not reverse
+
+### Public Vs private
+
+In a restaurent:
+* The front of the house is where the clients enter
+* Back is the kitchen: where you prepare dishes to serve the client
+
+ 
