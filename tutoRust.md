@@ -498,16 +498,16 @@ In module we use path to identify item location
 
 
 To import (declare) a module code: `Mod myModule`  
-If the importation is in a main file search in a src/myModule.rs  
-If the declaration is inside a module, search in: src/myModule/mySub.rs
+If the importation is in a main file search in a `src/myModule.rs`  
+If the declaration (importation) is inside a module, search in: `src/myModule/mySub.rs`
 
-Iteam inside a module is private from it's parent module, access is deny   
+Item inside a module is private from it's parent module: access is deny   
 Two things to know:
 * Use `mod my_module {}` to create (define) a private module (item not accesable)
 * Use `pub mod my_module  {}` to define a public module
-* In a PUBLIC MODULE we can also use `pub enum` to make a ITEM PUBLIC too  
+* In a PUBLIC MODULE we can also use `pub myItem` to make a ITEM PUBLIC too  
 * Use `mod my_module;` to load a module for  private use (in crate module)
-* Use `pub mod my_module;` to load a module with public use. So it's possible to access item in a external ways. (in sub module)
+* Use `pub mod my_module;` to load a module with public use. So it's possible to access item in a external ways (in sub module)
 
 
 
@@ -524,4 +524,273 @@ In a restaurent:
 * The front of the house is where the clients enter
 * Back is the kitchen: where you prepare dishes to serve the client
 
+ ## Common Collection
+
+Recall:
+
+```rust
+let myArray = [1, 2, 3];  // Same type, fixed size (Can be mutable).
+let myTuple = (1, 2.1, "3")  // Diff type, fixed size.
+```
+
+ ### Vector
+
+#### Creation
+
+```rust
+let v: Vec<i32> = Vec::new();  // Type spec because rust connot infer.
+let v = vec![1, 2, 3];  // Same type, varible size.
+```
+
+#### Add
+
+```rust
+v.push(5);  // Only for mutable vector.
+```
+
+#### Get
+
+```rust
+let i: &i32 = &v[2];  // Crash if the index 2 is not created (OOB).
+let i: Option<i32> = v.get(2);  // If OOB then return None
+```
+
+#### Loop
+
+Rust store vector's value on the heap and next to each other. If there is not anymore sufficently space in memory. Rust move the vector to get a bigger space. So we cannot borow a value and push in the same type.
+
+```rust
+let mut v = vec![1, 2, 3];
+let i = &v[0];
+v.push(4);  // BUG !!!
+```
+
+A reference is a pointer (adress memory) that we can follow to get value but not write on it. To change a pointer value we need to make a dereference:
+
+```rust
+let mut v = vec![1, 2, 3];
+for i in &v {
+    *i += 1;
+}
+```
+
+**Little ticks:** A vector can grow up in size but only store on type. To have multiple type we need to make a vector of enum.
+
+
+### String
+
+Rust only have one type of string in the core language the **string slice** `str`.
+Slices are continus sequences in memory.
+
+#### Creation
+
+In rust `String` are UTF-8 encoded so each letter have 2 or 4 bytes memory.
+
+```rust
+let myStr = "hello";  // String literal are directly stored in memory in str type.
+
+let myString = String::new();
+let myString = "hello".to_string();
+let mySring = String::from("hello");
+```
+
+#### Add
+
+```rust
+myString.push_str("hello");  // Push Borrow "hello".
  
+s1 + &s2  // Take ownership of s1 and always use a reference for s2. Like add.
+format!("{s1}-{s2}-{s3}");  // Use references, concatenate string but not print.
+```
+
+#### Loop
+
+```rust
+for c in s.chars() {};
+```
+
+
+### Hash map
+
+* **Hash** to protect the data
+* **map** like Python's dictionary
+
+#### Creation
+
+**let** stand for *"alouer"* in french.
+
+```rust
+use std::collections::HashMap;  // HasMap rarely used so we need to import them.
+let mut scores = HashMap::new();
+```
+
+#### Get
+
+Explenation:
+
+1. `get()` return `Option<&V>`
+1. `copied()` return `Option<V>`
+1. `unwrap_or()` return `V`. The digit is always on the right near of the parentesis and is it the else method.
+
+```rust
+let team_name = String::from("Blue");
+let score = scores.get(&team_name).copied().unwrap_or(0);
+```
+
+#### Add
+
+Preserve or owerwite.
+
+```rust
+scores.insert("blue", 10)  // Overwrite if the key already exist. 
+scores.entry("blue").or_insert(50)  // Insert only if the key not already exist.
+```
+
+`or_insert()` return a `&mut` so we nned to make a dereference to change the pointer value.
+
+```rust
+let count = map.entry("blue").or_insert(0);
+*count += 1;
+```
+
+#### Loop
+
+```rust
+for (key, value) in &scores {
+    println!("{key}: {value}");
+}
+```
+
+## Error Handling
+
+Two type of error in rust:
+* Recoverable: can be fixed by the user (e.g. file not found). Type `Result<T, E>`
+* Unrecoverable: cannot be fixed (e.g. OOB Array). Panic macro `panic!`
+
+### Unrecoverable
+
+Panic exit the code and clean up the memory but we can conserve it with:
+
+```toml
+[profile.release]
+panic = 'abort'
+```
+
+Panic also create a backtrace (all functions called by the program). To see the bavktrace:
+
+```bash
+RUST_BACKTRACE=1 cargo run
+```
+
+### Recoverable Error
+
+```rust
+enum Result<T, E> {
+    Ok(T),  // Type error in case of success.
+    Err(E),  // Error type in case of fail.
+}
+```
+
+Can be managed by `match`:
+
+```rust
+use std::fs::File;
+
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,  // return the inner file value out of the Ok variant.
+        Err(error) => panic!("Problem opening the file: {:?}", error),
+    };
+}
+```
+
+We can also have multiple error management. Here if the file not exist we create it.  
+The code `File::create("hello.txt")` try to create a file and return an enum of success just like the open ways:
+
+```rust
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,  // File Creation.
+                Err(e) => panic!("Problem creating the file: {:?}", e),
+            },
+            other_error => {
+                panic!("Problem opening the file: {:?}", other_error);
+            }
+        },
+    };
+}
+```
+
+Shortcut to just **unwrap** the OK case and **panic** in error case:
+
+```rust
+let greeting_file = File::open("hello.txt").unwrap();
+let greeting_file = File::open("hello.txt")
+        .expect("hello.txt should be included in this project");
+```
+
+We can also exec code instead of panic with `unwrap_or_else()`:
+
+```rust
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let greeting_file = File::open("hello.txt").unwrap_or_else(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            File::create("hello.txt").unwrap()
+        } else {
+            panic!("Problem opening the file: {:?}", error);
+        }
+    });
+}
+```
+
+Just like unwrap but not panic in case of error (`?`):
+
+* In case of OK(T) unwrap T and **continuing** the main function execution (whose called the ? operator)
+* In case of Err(E) return Err(E) and **early return** of the main fct
+
+```rust
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username = String::new();
+    // So if open() failed the '?' make "read_username_from_file" return Err().
+    // We even not exec the "read_to_string".
+    File::open("hello.txt")?.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+
+The `?` work also on `Option<T>`
+
+But the best ways to extract the file content in variable is:
+
+```rust
+use std::fs;
+use std::io;
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    fs::read_to_string("hello.txt")
+}
+```
+
+`from` is the Rust way to convert one type to another type
+
+### Advice in error management
+
+* `Panic` in case of tests
+* `Result` in case of wrong user input
+* Create it's own type to make check at the object creation. So we don't need to make the same check all the time when we used a standard type instead of it's own type
