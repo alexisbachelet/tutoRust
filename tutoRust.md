@@ -462,12 +462,13 @@ if let Some(max) = config_max {
      println!("The maximum is {}", max);
 }
 ```
- 
- ## Crates
+
+## Crates
 
 ### Definitions
 
 Crate: Is the main file that link to other file. Two forms:
+
 * Binary (main)
 * Library (sub fct)
 
@@ -476,8 +477,8 @@ Package: Contain as many binary crates as you like, but at most only one library
 Recall to crate a packge:
 
 ```bash
-$ cargo new my-project
-$ cargo new restaurant --lib
+cargo new my-project
+cargo new restaurant --lib
 ```
 
 The main file location by default:
@@ -496,22 +497,21 @@ src/bin/my_bin.rs
 In a crate we have module: there are like a section of codes  
 In module we use path to identify item location  
 
-
 To import (declare) a module code: `Mod myModule`  
 If the importation is in a main file search in a `src/myModule.rs`  
 If the declaration (importation) is inside a module, search in: `src/myModule/mySub.rs`
 
-Item inside a module is private from it's parent module: access is deny   
+Item inside a module is private from it's parent module: access is deny  
 Two things to know:
+
 * Use `mod my_module {}` to create (define) a private module (item not accesable)
 * Use `pub mod my_module  {}` to define a public module
 * In a PUBLIC MODULE we can also use `pub myItem` to make a ITEM PUBLIC too  
 * Use `mod my_module;` to load a module for  private use (in crate module)
 * Use `pub mod my_module;` to load a module with public use. So it's possible to access item in a external ways (in sub module)
 
-
-
 Don't need to write:
+
 * `crate::garden::vegetables::Asparagus`
 * `use crate::garden::vegetables::Asparagus`
 
@@ -521,10 +521,11 @@ Child module can access code in parent module but not reverse
 ### Public Vs private
 
 In a restaurent:
+
 * The front of the house is where the clients enter
 * Back is the kitchen: where you prepare dishes to serve the client
 
- ## Common Collection
+## Common Collection
 
 Recall:
 
@@ -533,7 +534,7 @@ let myArray = [1, 2, 3];  // Same type, fixed size (Can be mutable).
 let myTuple = (1, 2.1, "3")  // Diff type, fixed size.
 ```
 
- ### Vector
+### Vector
 
 #### Creation
 
@@ -576,13 +577,12 @@ for i in &v {
 
 **Little ticks:** A vector can grow up in size but only store on type. To have multiple type we need to make a vector of enum.
 
-
 ### String
 
 Rust only have one type of string in the core language the **string slice** `str`.
 Slices are continus sequences in memory.
 
-#### Creation
+#### String-Creation
 
 In rust `String` are UTF-8 encoded so each letter have 2 or 4 bytes memory.
 
@@ -594,7 +594,7 @@ let myString = "hello".to_string();
 let mySring = String::from("hello");
 ```
 
-#### Add
+#### String-Add
 
 ```rust
 myString.push_str("hello");  // Push Borrow "hello".
@@ -603,19 +603,18 @@ s1 + &s2  // Take ownership of s1 and always use a reference for s2. Like add.
 format!("{s1}-{s2}-{s3}");  // Use references, concatenate string but not print.
 ```
 
-#### Loop
+#### String-Loop
 
 ```rust
 for c in s.chars() {};
 ```
-
 
 ### Hash map
 
 * **Hash** to protect the data
 * **map** like Python's dictionary
 
-#### Creation
+#### Hash-Creation
 
 **let** stand for *"alouer"* in french.
 
@@ -624,7 +623,7 @@ use std::collections::HashMap;  // HasMap rarely used so we need to import them.
 let mut scores = HashMap::new();
 ```
 
-#### Get
+#### Gash-Get
 
 Explenation:
 
@@ -637,7 +636,7 @@ let team_name = String::from("Blue");
 let score = scores.get(&team_name).copied().unwrap_or(0);
 ```
 
-#### Add
+#### Hash-Add
 
 Preserve or owerwite.
 
@@ -653,7 +652,7 @@ let count = map.entry("blue").or_insert(0);
 *count += 1;
 ```
 
-#### Loop
+#### Hash-Loop
 
 ```rust
 for (key, value) in &scores {
@@ -664,6 +663,7 @@ for (key, value) in &scores {
 ## Error Handling
 
 Two type of error in rust:
+
 * Recoverable: can be fixed by the user (e.g. file not found). Type `Result<T, E>`
 * Unrecoverable: cannot be fixed (e.g. OOB Array). Panic macro `panic!`
 
@@ -794,3 +794,158 @@ fn read_username_from_file() -> Result<String, io::Error> {
 * `Panic` in case of tests
 * `Result` in case of wrong user input
 * Create it's own type to make check at the object creation. So we don't need to make the same check all the time when we used a standard type instead of it's own type
+
+## More Generic
+
+### Generic Data Type
+
+```rust
+// For a function.
+let myArray = [1, 2, 3];
+let myArray: [i32, 3] = [1, 2, 3];
+fn larget_i32(list: &[i2]) -> &i32 {};
+fn larget<T>(list: &[T]) -> &T {};
+```
+
+```rust
+// For a struct.
+struct Point<T> { x: T, y: T, }
+let i = Point( x: 1, y: 2 );
+
+struct Point<T, U> { x: T, y: U, }  // U is just after T.
+let i = Point( x: 1, y: 2.1);
+```
+
+Double `<T>`: the first is for generic type, the second is to point on the right
+struct:
+
+```rust
+// For method : Function on struct.
+struct Point<T> { x: T, y: T, }
+
+impl Point<f32> {  // This Method only work on Point<f32> type.
+    fn x1(&self) -> f32 { ... }
+}
+
+impl<T> Point<T> {  // Double <T>, to def method that work on all Point type.
+    fn x2(&self) -> &T { self.x }
+}
+```
+
+```rust
+struct Point<T> { x: T}
+
+impl<T> Point<T> {
+    // To use generic param inside a generic method.
+    fn copy<Y> (&self, other: Point<Y>) -> Point(Y) {...}
+}
+```
+
+### Trait
+
+#### Basic definitions
+
+To share functionality across many type (struc)
+
+To define a trait specific to each struct:
+
+```rust
+// We are in "Agregator" file (library) so pub to be used in main file.
+pub trait Summary {
+    fn summarize(&self) -> String;  // end with ";" because it's just signature.
+}
+
+pub struct Article { pub title: String, pub content: String }
+pub struct Tweet { pub user: String, pub content: String }
+
+impl Summary for Article {  // impl myTrait for myStruct
+    fn summarize(&self) -> String {  // Always the same signature as the trait.
+        format!("{}, by {}", self.title, self.content)
+    }  
+}
+```
+
+But we can be more generic with generic trait. No need to specify a function at each time we use the trait on a new type. By default all struct have the same method.
+
+```rust
+pub trait Summary {
+    fn summarise(&self) -> String { ... }  // Here is function definition.
+}
+```
+
+To use a trait in a main file:
+
+```rust
+// aggregator is the library where the trait is.
+// And we import the trait and it's struct.
+use aggregator::{Summary, Article};
+
+fn main() {
+    let article = Tweet { ... };
+    println!("Article summary: {}", article.summarize());
+}
+```
+
+#### Cool tips
+
+To have generix trait that work on all spficities:
+
+* We can implement a generic trait with an specific mehod:  
+
+```rust
+pub trait Summary {
+    fn summarize_author(&self) -> String;
+    fn summarize(&self) -> String {
+        format!("(Read more from {}...)", self.summarize_author())
+    }
+}
+```
+
+* So we can def the specific method:
+
+```rust
+impl Summary for Article {
+    fn summarize_author(&self) -> String { self.author }
+}
+```
+
+* So we can call the huge generic method on any specific type.
+
+#### Trait use restriction
+
+We can implement a trait on a type: only if **trait** and/or **type** are defined in the local trait.
+
+So if we are in "aggregator" library (crate) we can link to our local struct "Article" on generic trait like "Display"
+
+#### Restiction on genereic type
+
+```rust
+// item can be any type but it need to implement the Summary trait.
+pub fn notify(item: &impl Summary) { ... }
+pub fn notify<T: Summary>(item: &T) { ... }  // Also work but it's less verbose.
+```
+
+```rust
+pub fn notify<T: Summary + Display>(item: &T) { ... }  // Double restriction.
+
+pub fn notify<T, U>(t: &T, u: &U) -> i32  // Double restrict more verbose.
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{ ... }
+```
+
+Define method to all MyStruct type that have the DIplay trait.
+
+```rust
+impl<T: Display> MyStruct<T> { 
+    fn cmp_display(&self) { ... }
+}
+```
+
+We conditionally implement a trait for any type that implements another trait:
+
+```rust
+// Implemente trait ToString for all type that have DIsplay trait.
+impl<T: Display> ToString for T { ... } 
+```
