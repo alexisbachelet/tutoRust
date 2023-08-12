@@ -943,9 +943,108 @@ impl<T: Display> MyStruct<T> {
 }
 ```
 
-We conditionally implement a trait for any type that implements another trait:
+We can conditionally implement a trait for any type that implements another trait:
 
 ```rust
 // Implemente trait ToString for all type that have DIsplay trait.
 impl<T: Display> ToString for T { ... } 
 ```
+
+### Lifetime
+
+Lifetime ensure that **reference** are **valid** as long as we need them to be alive.  
+Every reference has a lifetime and in magor case Rust can **infer** it.
+
+To avoid a dangling reference, the rust compiler have a borrow checker:
+
+1. **Lifetime:** the time period between when my variable is init and disepear.
+1. The borrow checker compare the lifetime of the real data and it's references. The data must have a longer lifetime than it's references.
+
+```rust
+fn main() {
+    let x =5;              // -----------+  'b is data and 'a the ref.
+                           //            |   
+    let r = &x;            // --+-- 'a   |
+                           //   |        |
+    println!("r: {}", r);  //   |        |
+}                          // --+--------+
+```
+
+Rust can't infer in this case:
+
+```rust
+// Rust can't infer is the returned ref is from `x` or `y`.
+fn longest(x: &str, y: &str) -> &str {...}
+```
+
+So we need to help the borrow checker by given an explicit **lifetime annotations** to the parameters.  
+**Lifetime Annotations** are not **Lifetime**!  
+**Lifetime Annotations** are here to describes the **relationships** of multiples **lifetime's references** to each others. They don't change the lifetime of references, it's just relationships: a minimum lifetime shared by params.
+
+```rust
+// Here 'a is the shortest lifetime of a references between `x` and `y`.
+// The return value have so a lifetime equal to 'a (the shortest).
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {...}
+```
+
+```rust
+// 'a is the shorstest lifetime bettwen `x` and `y`.
+// But it's also the real lifetime of the return value.
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+
+// Even if the return value is a reference of string1 the longest string.
+// The lifetime of the return value is equal to the shortest lifetime.
+// So here the return ref of string1 have the lifetime of string2.
+// So we canno't use the `res` value after the end of string2.
+fn main() {
+    let string1 = String::from("long string is long");
+    {
+        let string2 = String::from("xyz");
+        let res = longest(string1.as_str(), string2.as_str());
+        // println!("The longest string is {}", res);  // Here is OK !
+    }
+    println!("The longest string is {}", res);  // Here it's work, it's BUG !
+}
+```
+
+We can define a struc to hold references (instead of owned type):
+
+```rust
+// We need to add a lifetime annotation on every struct's reference. 
+struct ImportantExcerpt<'a> {
+    part: &'a str,
+}
+
+// To implemente a method we need to be generic on the imp part.
+// because those lifetimes are part of the struct’s type
+impl<'a> ImportantExcerpt<'a> {
+    fn level(&self) -> i32 {
+        3
+    }
+}
+```
+
+#### Lifetime Elusion (ominision)
+
+Three rule to infer lifetime time annotation to a function:
+
+1. Each parameter have by default there own lifetime annotation `fn foo<'a, 'b>`
+1. If there is only one input lifetime: all the output have the same lifetime
+1. If there is a `&self` input lifetime: all the output have the same lifetime of `&self`
+
+#### Static lifetime
+
+A Staticsreference is valid for all the program duration (stored in binary)
+
+```rust
+// In Rust all string literal are static references. So no disepear 
+let s: &'static str = "my_str";
+```
+
+## Automated Test
