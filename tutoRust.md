@@ -1048,3 +1048,122 @@ let s: &'static str = "my_str";
 ```
 
 ## Automated Test
+
+By default rust create a test module for each new library:
+
+```bash
+cargo new adder --lib  # My Library.
+```
+
+```rust
+// src/lib.rs
+// By default like an "Hello World!"
+#[cfg(test)]
+mod tests {
+
+    #[test]  // Attributes are metadata about pieces of Rust code (like derive).
+    fn it_works() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn another() {
+        panic!("Make this test fail");
+    }
+
+}
+```
+
+```bash
+cargo test  # To run test.
+```
+
+```rust
+#[derive(Debug)]
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn can_hold(&self, other: &Rectangle) -> bool {
+        self.width > other.width && self.height > other.height
+    }
+}
+
+fn main() {
+    let rect = Rectangle { width: 30, height: 50, };
+    println!("rect is {:?}", rect);  // To quickly print all struct's attributes.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;  // Relative path to the current module here: lib.rs
+
+    #[test]
+    fn larger_can_hold_smaller() {
+        let larger = Rectangle {
+            width: 8,
+            height: 7,
+        };
+
+        let smaller = Rectangle {
+            width: 5,
+            height: 1,
+        };
+
+        assert!(larger.can_hold(&smaller));
+    }
+}
+```
+
+So we have in main test function:
+
+* `assert!(add_two(2) == 4)`: for bollean
+* `assert_eq!(4, add_two(2))`: the left and right side doesn't matter in Rust.
+* `assert_ne!()`: not equal
+* `#[should_panic]`: to exec test function. It's pass if the function panik, fail if not.
+
+To use `assert_eq` and `assert_ne` we need to implement the `PartialEq` and `Debug` trait to our custom enum and struct. `#[derive(PartialEq, Debug)]`
+
+We can add custom error message:
+
+```rust
+#[test]
+fn greeting_contains_name() {
+    let result = greeting("Carol");
+    assert!(
+        result.contains("Carol"),
+        "Greeting did not contain name, value was `{}`",
+        result
+    );
+}
+```
+
+```rust
+#[test]
+#[should_panic]  // #[should_panic(expected = "substring: beetween 1 and 100")] 
+fn greater_than_100() { Guess::new(200); }
+```
+
+```rust
+// Classicly:
+#[test]
+fn it_works() {
+    let result = 2 + 2;
+    assert_eq!(result, 4);
+}
+
+// But we can used Result<T, E>
+// If the test fail return an Err(E)
+#[test]
+fn it_works() -> Result<(), String> {  // Result<T, E>   // () is unit and is the Rust empty.
+    if 2 + 2 == 4 {  // The test is HERE!!! NO ASSERT HERE like in above example!!!
+        Ok(())
+    } else {
+        Err(String::from("two plus two does not equal four"))
+    }
+    // Pros: we can use `?` operator to unwrap Ok() or early return Err(E) in case of Err(E).
+}
+```
