@@ -1167,3 +1167,110 @@ fn it_works() -> Result<(), String> {  // Result<T, E>   // () is unit and is th
     // Pros: we can use `?` operator to unwrap Ok() or early return Err(E) in case of Err(E).
 }
 ```
+
+### Test aguments
+
+```bash
+cargo test argForSelectTest -- argToAllTest
+```
+
+```bash
+cargo test -- --test-threads=1  # 1 Thread so no parallelism.
+cargo test -- --show-output  # Show the print in test functions.
+cargo test sub_set_of_test_name  # To only select subset of tests.
+```
+
+```rust
+#[test]
+#[ignore]  // To ignore a test.
+fn expensive_test() { ... }
+```
+
+### Test organisation
+
+Two types:
+
+* **Unit test**
+* **Integration tests:** import (use) our library and tets it like an external user.
+
+#### Unit Tests
+
+You’ll put unit tests in the **src** directory in each file with the code that they’re testing. The convention is to create a module named **tests** in each file to contain the test functions and to annotate the module with cfg(test).
+
+```rust
+// `pub` on a module only lets code in its ancestor modules refer to it.
+pub fn add_two(a: i32) -> i32 {
+    internal_adder(a, 2)
+}
+
+fn internal_adder(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]  // Compile this piece of code only for `cargo test` not `build`.
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal() {
+        // We can use (import) private item (function) in child module
+        // from their ancestor mudule.
+        // So we use internal_adder in `tests` mod.
+        assert_eq!(4, internal_adder(2, 2));
+    }
+}
+```
+
+#### Integration Tests
+
+We nneed to create a **tests** repo with as many file as we want.
+
+```tree
+my_project
+├── Cargo.lock
+├── Cargo.toml
+├── src
+│   └── lib.rs
+└── tests
+    └── integration_test.rs
+```
+
+```rust
+// tests/integration_tests.rs
+// No need to add a #[cfg(test)]: tests files are separated crate from main.
+use adder;
+
+#[test]
+fn it_adds_two() {
+    assert_eq!(4, adder::add_two(2));
+}
+```
+
+We can use a setup test file to share code with other test files:
+
+```rust
+// tests/common/mod.rs
+pub fn setup() {
+    // setup code specific to your library's tests would go here
+}
+```
+
+```rust
+// tests/integration_test.rs
+use adder;  // Because is an external crate.
+mod common;  // Because is in the same crate but in different files.
+
+#[test]
+fn it_adds_two() {
+    common::setup();
+    assert_eq!(4, adder::add_two(2));
+}
+```
+
+We cannot use integration tests on binary crate. So we need to create a library crate with all the code and a minimum binary crate that use the lib.
+So we can test the lib and use it with the bin.
+
+### Project: Create a command line program
+
+We are going to make `grep` bin: We specify the path file and a string to find.
+All the lines of the file that contain the specific word are printed
