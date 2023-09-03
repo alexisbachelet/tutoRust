@@ -33,7 +33,9 @@ target  # Ignore target folder.
 SSH-Agent: To save password:
 
 ```bash
-eval "$(ssh-agent -s)"
+# eval to make a double evaluation:
+# 1 generate variable, 2 print it.
+eval "$(ssh-agent -s)"  # $(cmd) = `cmd` = run cmd and place output on main.
 ssh-add 
 ```
 
@@ -1272,5 +1274,145 @@ So we can test the lib and use it with the bin.
 
 ### Project: Create a command line program
 
-We are going to make `grep` bin: We specify the path file and a string to find.
+We are going to make `minigrep` binary code: We specify a path file and a string to find.
 All the lines of the file that contain the specific word are printed
+
+```bash
+cargo new minigrep
+cd minigrep
+cargo run -- mySubString myFile.txt  # cargoArg -- binArgs.
+```
+
+```rust
+// use is a shortcut to avoid write full path many times.
+use std::env; // To get cmd line param.
+use std::process; // To exit code.
+
+use minigrep::Config;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    //dbg!(args);  // to print all data of an object.
+
+    //  err = the iner value of an Err type
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        println!("Problem parsing arguments: {err}");
+        process::exit(1); // The exit status code.
+    });
+
+    println!("Searching for {}", config.query);
+    println!("In file {}", config.file_path);
+
+    // exec run and if it's return an Err then exec the {}.
+    if let Err(e) = minigrep::run(config) {
+        println!("Application error: {e}");
+        process::exit(1);
+    }
+}
+```
+
+```rust
+// src/lib.rs 
+use std::error::Error;
+use std::fs;
+
+pub struct Config {
+    pub query: String,
+    pub file_path: String,
+}
+
+impl Config {
+    // build and not new because new must never fail.
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 3 {
+            return Err("not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+
+        Ok(Config { query, file_path })
+    }
+}
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    // Box<dyn Error> mean return a type that implements the Error trait.
+    let contents = fs::read_to_string(config.file_path)?;
+    // .expect("myErrorMessage") ; "?" extract or return err.
+    println!("With text:\n{contents}");
+    Ok(())
+}
+
+ ```
+
+Step to know for dev:
+
+1. Split your program into a *main.rs* and a *src/lib.rs*. The main call the lib and handle error on lib.
+
+## Iterator and closures
+
+**Functional programming:** A value can be a function for latter used. They are named **Closures**.
+
+### Closures
+
+```rust
+// # to speack to the compiler.
+// derive to quickly implement a trait (program derivation) to our struct.
+// Trait is a collection of method for genereic type.
+#[derive(Debug, PartialEq, Copy, Clone)]
+enum ShirtColor {
+    Red,
+    Blue,
+}
+
+struct Inventory {
+    shirts: Vec<ShirtColor>,
+}
+```
+
+```rust
+impl Inventory {
+    fn giveaway(&self, user_preference: Option<ShirtColor>) -> ShirtColor {
+        user_preference.unwrap_or_else(|| self.most_stocked())
+    }
+
+    fn most_stocked(&self) -> ShirtColor {
+        let mut num_red = 0;
+        let mut num_blue = 0;
+
+        for color in &self.shirts {
+            match color {
+                ShirtColor::Red => num_red += 1,
+                ShirtColor::Blue => num_blue += 1,
+            }
+        }
+        if num_red > num_blue {
+            ShirtColor::Red
+        } else {
+            ShirtColor::Blue
+        }
+    }
+}
+```
+
+```rust
+fn main() {
+    let store = Inventory {
+        shirts: vec![ShirtColor::Blue, ShirtColor::Red, ShirtColor::Blue],
+    };
+
+    let user_pref1 = Some(ShirtColor::Red);
+    let giveaway1 = store.giveaway(user_pref1);
+    println!(
+        "The user with preference {:?} gets {:?}",
+        user_pref1, giveaway1
+    );
+
+    let user_pref2 = None;
+    let giveaway2 = store.giveaway(user_pref2);
+    println!(
+        "The user with preference {:?} gets {:?}",
+        user_pref2, giveaway2
+    );
+}
+```
