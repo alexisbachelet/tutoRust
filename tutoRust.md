@@ -1321,6 +1321,7 @@ pub struct Config {
     pub file_path: String,
 }
 
+// Step 1: create an object.
 impl Config {
     // build and not new because new must never fail.
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
@@ -1335,19 +1336,78 @@ impl Config {
     }
 }
 
+// Step 2: use the object.
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     // Box<dyn Error> mean return a type that implements the Error trait.
-    let contents = fs::read_to_string(config.file_path)?;
+
     // .expect("myErrorMessage") ; "?" extract or return err.
-    println!("With text:\n{contents}");
+    let contents = fs::read_to_string(config.file_path)?;
+    
+    //println!("With text:\n{contents}");
+    for line in search(config.query, config.contents) {
+        println!("{line}")
+    }
+    
     Ok(())
 }
 
- ```
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.contains(query) {
+            results.push(line);
+        }
+    }
+
+    results
+}
+```
+
+The first step in TDD is to fail, so we must write a failling test.
+We write begining (var init) and ending (test) but the middle part must return nothing.
+
+```rust
+// lib.rs
+#[cfg(test)]  // Only compile in test case.
+mod tests {
+    use super::*;  // Relative to the file (mod). So here import the lib.
+
+    #[test]  // Create a test function and run it with `cargo test`.
+    fn one_result() {
+        let query = "duct";
+        // The '\' is to avoid a new line.
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.";
+
+        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+    }
+}
+```
+
+We can capt `env` variable with:
+
+```rust
+use std::env;
+let ignore = env::var("IGNORE_CASE").is_ok();  // If is defined by the user.
+```
+
+```bash
+IGNORE_CASE=1 cargo run -- to poem.txt
+```
+
+We can also pritn on error steam than standard output:
+
+```rust
+eprintln!();
+```
 
 Step to know for dev:
 
-1. Split your program into a *main.rs* and a *src/lib.rs*. The main call the lib and handle error on lib.
+1. Split your program into a *main.rs* and a *src/lib.rs*. The main call the lib and handle error on it. Main init a *lib* object and use it.
+1. Always use struct instead of tuples
 
 ## Iterator and closures
 
@@ -1358,6 +1418,7 @@ Step to know for dev:
 ```rust
 // # to speack to the compiler.
 // derive to quickly implement a trait (program derivation) to our struct.
+// Instead of write a generic code by ourself we can quickly automaticaly do it.
 // Trait is a collection of method for genereic type.
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum ShirtColor {
@@ -1368,9 +1429,7 @@ enum ShirtColor {
 struct Inventory {
     shirts: Vec<ShirtColor>,
 }
-```
 
-```rust
 impl Inventory {
     fn giveaway(&self, user_preference: Option<ShirtColor>) -> ShirtColor {
         user_preference.unwrap_or_else(|| self.most_stocked())
@@ -1415,4 +1474,59 @@ fn main() {
         user_pref2, giveaway2
     );
 }
+```
+
+Closure are short function with no type:
+
+```rust
+fn  add_one_v1   (x: u32) -> u32 { x + 1 }
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+let add_one_v3 = |x|             { x + 1 };
+let add_one_v4 = |x|               x + 1  ;
+
+let res = add_one_v4(4);  // To use it.
+```
+
+The type of a closure is automatically determined by the fist used of the closure.
+So if we changer the paramaters type in a second use, there is a bug.
+
+A closure automaticaly determined if it need to : borrowing immutably, borrowing mutably or taking ownership. SO no need to use `&`. Recall: no other borrows are allowed when there’s a mutable borrow.
+
+```rust
+let list = vec![1, 2, 3];
+let only_borrows = || println!("immutable borrow: {:?}", list);
+```
+
+But we can force a closure to take ownerchip if we want (with `move`):
+
+```rust
+move || x
+```
+
+How much we can repeat (call) a closure:
+
+* `FnOnce` because can only be call once. Because we `move` value, so it can all only work once. he second time the value is aleready gone.
+* `FnMut` to `mut` values. On a slice call the cosure multiple times.
+* `fn` multiple time with no change.
+
+```rust
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let mut list = [
+        Rectangle { width: 10, height: 1 },
+        Rectangle { width: 3, height: 5 },
+        Rectangle { width: 7, height: 12 },
+    ];
+
+    list.sort_by_key(|r| r.width);  // FnMut: no return just mutation
+}
+```
+
+```rust
+// "_" to let rust infer type.
+let v: Vec<_> = iter.collect();
 ```
