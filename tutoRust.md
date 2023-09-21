@@ -56,14 +56,12 @@ cargo --version
 ### The Rustc Way
 
 ```bash
-mkdir projects
-cd ./projects
 mkdir hello_world
 cd hello_world
 ```
 
 ```rust
-// /main.rs
+// main.rs
 fn main() {
     println!("Hello, world!");
 }
@@ -77,8 +75,6 @@ rustc main.rs
 ### The Cargo Way
 
 ```bash
-mkdir projects
-cd ./projects
 cargo new hello_cargo
 ```
 
@@ -94,7 +90,6 @@ cargo run
 
 ```bash
 cargo build
-./target/debug/hello_cargo
 ```
 
 ## Why rust
@@ -1526,7 +1521,171 @@ fn main() {
 }
 ```
 
+### Iterator
+
+In Rust, iterators are lazy, meaning they are not use imediatly.
+
 ```rust
-// "_" to let rust infer type.
-let v: Vec<_> = iter.collect();
+let v1 = vec![1, 2, 3];
+let v1_iter = v1.iter();
 ```
+
+`Item` type is used in the return type of the `next` method. The first next is always the first element in a `Option` type.
+
+```rust
+let v1 = vec![1, 2, 3];
+let mut v1_iter = v1.iter();  // With next we need to def a mut var iterator.
+assert_eq!(v1_iter.next(), Some(&1));
+
+for v in v1.iter() {}  // A for take owernship so it's implied mut.
+```
+
+Methods that call next are called **consuming adaptors**:
+
+```rust
+let total: i32 = v1.iter().sum();
+```
+
+**Iterator adaptors** are methods that don’t consume the iterator. Instead they produce a new different iterator.
+
+```rust
+// "_" to let Rust infer the Vec type.
+// We need to use a .coolect() to consume the iterator and get res.
+ let v: Vec<_> = v1.iter().map(|x| x + 1).collect();
+
+//
+v1.iter().filter(|s| s.size == 10).collect()
+ ```
+
+### Improve code with iterator and closure
+
+Instead of borrowing a slice `&[String]` we can use iterator.
+
+```rust
+impl Config {
+    // mut args beacause we are going to mut it by iterating over it.
+    // args: generic type that implements the Iterator trait on string.
+    pub fn build(mut args: impl Iterator<Item = String>) -> ...
+    //pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        
+        if args.len() < 3 {
+            return Err("not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let file_path = args[2].clone();
+        let ignore_case = env::var("IGNORE_CASE").is_ok();
+
+        Ok(Config { query, file_path,ignore_case, })
+}
+```
+
+```rust
+pub fn build(...) {
+    args.next();  // Because the first arg is always the code name.
+    
+    // No if let because we exec code on None variant.
+    let query = match args.next() {
+        Some(arg) => arg,
+        None => return Err("No word query"),  // Early return of builf function.
+    };
+
+    Ok(Config { query, })
+}
+```
+
+We can rewrite also like this:
+
+```rust
+for line in contents.lines() {
+    if line.contains(query) {
+        results.push(line);
+    }
+}
+result  // return
+
+// We chain the dot.
+// Here no mutable intermediate results vector: so we can have multiple thread.
+contents
+    .lines()
+    .filter(|line| line.contains(query))
+    .collect()
+```
+
+## Cargo bonus
+
+There is a special `build` when we have finish the dev:
+
+```bash
+cargo build  # dev profile.
+cargo build --release  # To have more optimizations on compilation.
+```
+
+We can also create a **package** to have more than one lib on a project. So our main.rs can use two or more lb.rs
+
+Step one manuanly create a directory:
+
+```bash
+mkdir add
+cd add
+```
+
+Then manualy add a `toml`:
+
+```toml
+# Cargo.toml
+[workspace]
+
+members = [
+    "adder",
+]
+```
+
+```bash
+cargo new adder  # Add the bin on workspace.
+```
+
+Then rewrite `toml` to add the first lib.
+
+```toml
+[workspace]
+
+members = [
+    "adder",
+    "add_one",
+]
+```
+
+```bash
+cargo new add_one --lib
+```
+
+We can write our code on this `lib.rs`
+
+Then we must link our `bin.rs` to `lib.rs`
+
+```toml
+# adder/Cargo.toml
+[dependencies]
+add_one = { path = "../add_one" }
+```
+
+```rust
+use add_one;
+```
+
+Then we can exec code:
+
+```bash
+$ cargo build
+cargo run -p adder  # p stand for package.
+```
+
+We need to sepecify external package depensy on `toml` files of lib or bin but not the workspace `toml`, to use it:
+
+```toml
+[dependencies]
+rand = "0.8.5"
+```
+
+## Pointers
