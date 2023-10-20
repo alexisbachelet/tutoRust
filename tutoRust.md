@@ -1614,12 +1614,62 @@ contents
 
 ## Cargo bonus
 
+### Compile
+
 There is a special `build` when we have finish the dev:
 
 ```bash
 cargo build  # dev profile.
 cargo build --release  # To have more optimizations on compilation.
 ```
+
+### Documentation
+
+Documentation is how to use the code. USe three `///` and support Markdown.
+
+```rust
+/// Adds one to the number given.
+///
+/// # Examples
+///
+/// ```
+/// let arg = 5;
+/// let answer = my_crate::add_one(arg);
+///
+/// assert_eq!(6, answer);
+/// ```
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
+
+```bash
+cargo doc  # To generate the doc.
+cargo doc --open  # Open on a web browser.
+```
+
+List:
+
+* `///` To comment the next item.
+* `//!` To comment the current item, if there is no item: the binary is commented.
+
+```rust
+//! # My Lib
+//! 
+//! Here we speak about the concept of this lib.
+//! There is a blank line just after to ot commented `Kinds` but the bin.
+
+pub mod kinds {
+    /// The primary colors according to the RYB color model.
+    pub enum PrimaryColor {
+        Red,
+        Yellow,
+        Blue,
+    }
+}
+```
+
+### Package
 
 We can also create a **package** to have more than one lib on a project. So our main.rs can use two or more lb.rs
 
@@ -1688,4 +1738,146 @@ We need to sepecify external package depensy on `toml` files of lib or bin but n
 rand = "0.8.5"
 ```
 
-## Pointers
+## Smart Pointers
+
+A pointer is a variable that point (refer) to the memory adress of some other data.
+A reference `&` is a pointer.
+
+Diference bettween pointers ans references:
+
+* A smart pointer have some feature thar reference doesent have.
+* *Reference* **borrow** but *smart pointer* **own** the data they point to.
+
+### Box: to store on the heap
+
+Two reason to chose on the heap instead of stack:
+
+* When it's impossible to know the size of an object (recurcive type)
+* Transfer ownership without coping. Just pointer are copied
+
+```rust
+fn main() {
+    let b = Box::new(5);
+    // Here b is a pointer but act like a reference to 5.
+    // println! use ref, so don't need to deref to print.
+    println!("b = {}", b);
+}
+```
+
+```rust
+enum List {
+    Cons(i32, List),
+    Nil,
+}
+
+//with:
+use crate::List::{Cons, Nil};
+// No need anymore to write:
+let list = List::Cons(1, List::Nill)
+// but just:
+let list = Cons(1; Nill)  // nil is a empty list
+
+fn main() {
+    // Cons for Construct
+    // Nil for the end of a recurcion.
+    // (1, (2, (3, Nil)))
+    let list = Cons(1, Cons(2, Cons(3, Nil)));
+}
+```
+
+Instead of have an object with infinite size. We use indirection.  
+To store data indirectly thank to a pointer. Instead to have on infinite big block we have several definite blocks of data. Each of them point to the next.
+
+```rust
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+
+fn main() {
+    let list = Cons(1, Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
+}
+```
+
+### Deref
+
+Deref is used on pointer (reference) to return the value they point to.
+A pointer is a reference (adress memory) of a variable. With deref instead of return the ref we return the value.
+
+```rust
+fn main() {
+    let x = 5;
+    let y = &x;
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);
+}
+```
+
+To implent the deref trait. We need in one to define our own type:
+
+```rust
+//Define a "tuple structs", to store only one value of any type.
+struct MyBox<T>(T);
+
+impl<T> MyBox<T> {
+    fn new(x: T) -> MyBox<T> {
+        MyBox(x)
+    }
+}
+```
+
+Next we can add the deref trait:
+
+```rust
+use std::ops::Deref;  // ops = operators.
+
+// Associated types connect a type placeholder with a trait such that:
+// the trait method definitions can use these placeholder in their signatures.
+// slightly different way of declaring a generic parameter
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+```
+
+```rust
+fn main() {
+    let x = 5;
+    let y = MyBox::new(x);
+
+    assert_eq!(5, x);
+
+    // "*y" is equivalent to "*(y.deref())"
+    // so here y.deref() return the value in "myBox"
+    // and "*()"  return the real value even if y.deref() is a reference.
+    assert_eq!(5, *y);
+}
+```
+
+Deref coercion: when we return a ref of the wrong type. Rust can automaticaly change the type.
+
+```rust
+fn hello(name: &str) {  // use "&str"
+    println!("Hello, {name}!");
+}
+
+fn main() {
+    let m = MyBox::new(String::from("Rust"));
+    hello(&m);  // we give a "&String" but it's OK for hello function.
+}
+```
+
+There is two options:
+
+* Deref: fot ref
+* DerefMut: for mutable references
+
+### Cleanup memory
+
+a
