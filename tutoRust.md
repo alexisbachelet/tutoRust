@@ -1880,4 +1880,309 @@ There is two options:
 
 ### Cleanup memory
 
-a
+Automaticaly exec the drop trait when a variable go out of scope.
+Variables are dropped in the reverse order of their creations.
+
+```rust
+struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
+    }
+}
+
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("my stuff"),
+    };
+    let d = CustomSmartPointer {
+        data: String::from("other stuff"),
+    };
+    println!("CustomSmartPointers created.");
+}
+```
+
+```text
+CustomSmartPointers created.
+Dropping CustomSmartPointer with data `other stuff`!
+Dropping CustomSmartPointer with data `my stuff`!
+```
+
+We can also early drop if we want (no need to wait a variable go out of scope):
+
+```rust
+struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
+    }
+}
+
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("some data"),
+    };
+    println!("CustomSmartPointer created.");
+    drop(c);
+    println!("CustomSmartPointer dropped before the end of main.");
+}
+```
+
+```text
+CustomSmartPointer created.
+Dropping CustomSmartPointer with data `some data`!
+CustomSmartPointer dropped before the end of main.
+```
+
+### Multiple Ownership. Reference Counted
+
+Ownership is clear: one variable owns it's value.
+In some case it's usefull to have multiple ownership for one value.
+The value is not droped when a variable go out of scope beacause there is another value that own it.
+The value is droped when there is no variable that use it.
+
+```rust
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
+}
+
+// "crate" because we used it on main which it's a inner code.
+use crate::List::{Cons, Nil};
+use std::rc::Rc;
+
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));  // Rc::new.
+    let b = Cons(3, Rc::clone(&a));  // Rc::clone.
+}
+```
+
+To get the number of references:
+
+```rust
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    println!("count after creating a = {}", Rc::strong_count(&a));
+}
+```
+
+### Interior Mutability
+
+Interior mutability: to mut a inmutable refrences.
+
+Unsafe mode: to not use the compiler ownership rules. We manualy manage these rule.
+But it's slower because Rust check the borrowing rules not at compile time but in runtime. Because the compiler it's too cautious we can be more greedy with the unsafe mode.
+
+* `Box<T>`: recurcive type, fast copy (just the pointer is copied).
+* `Rc<T>`: to have multiple owership of an single data but not mutability.
+* `RefCell<T>`: Interior Mutaility, mut a single unmutable variable.
+
+Mock objects are specific types of test doubles (*doublures in french*) to keep recort to what appen in a test.
+
+```rust
+// Generic method for miceleaneous struct.
+// Important to notice is "&self" so self is unmutable.
+pub trait Messenger {
+    fn send(&self, msg: &str);
+}
+
+// "'a" is a generic lifetime parameters. It's important when we use references.
+// Any instance of LimitTracker can’t outlive the reference in "messenger".
+// "T" is a generic type  that implement the "Messenger" trait.
+pub struct LimitTracker<'a, T: Messenger> {
+    messenger: &'a T,
+    value: usize,
+    max: usize,
+}
+
+// We add method on our struct.
+// We define a struct that use an another struct.
+impl<'a, T> LimitTracker<'a, T>
+where
+    T: Messenger,  // Just a trait bound to a generic type.
+{
+    // The first method.
+    pub fn new(messenger: &'a T, max: usize) -> LimitTracker<'a, T> {
+        LimitTracker {
+            messenger,
+            value: 0,
+            max,
+        }
+    }
+
+    // The second.
+    pub fn set_value(&mut self, value: usize) {
+        self.value = value;
+
+        let percentage_of_max = self.value as f64 / self.max as f64;
+
+        if percentage_of_max >= 1.0 {
+            self.messenger.send("Error: You are over your quota!");
+        } else if percentage_of_max >= 0.9 {
+            self.messenger
+                .send("Urgent warning: You've used up over 90% of your quota!");
+        } else if percentage_of_max >= 0.75 {
+            self.messenger
+                .send("Warning: You've used up over 75% of your quota!");
+        }
+    }
+}
+```
+
+So we can define a "Messenger struct" (Mock object) to test the LimitTracker struct. The limitTracker will always send a message to the messegerObject but this not a normal messenger. It we never give the message instead it will store it in a vector.
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Define our own Messenger stuct.
+    struct MockMessenger {
+        sent_messages: Vec<String>,
+    }
+
+    // Add some methids.
+    impl MockMessenger {
+        fn new() -> MockMessenger {
+            MockMessenger {
+                sent_messages: vec![],
+            }
+        }
+    }
+
+    // Implement the trait.
+    impl Messenger for MockMessenger {
+
+        // BUG !!! Because &self is unmutable and "push" is a mut cmd.
+        // But we cannot use either a "send(&mut self, message: &str)
+        // Because it's not fit the trait signature.
+        // So we need a "trick" an unmutable var but in fact it's mut
+        // So we nned to use a ReffCells.
+        fn send(&self, message: &str) {
+            self.sent_messages.push(String::from(message));
+        }
+    }
+
+    #[test]
+    fn it_sends_an_over_75_percent_warning_message() {
+        let mock_messenger = MockMessenger::new();
+        let mut limit_tracker = LimitTracker::new(&mock_messenger, 100);
+
+        limit_tracker.set_value(80);
+
+        assert_eq!(mock_messenger.sent_messages.len(), 1);
+    }
+}
+```
+
+This is the trick the ReffCell an unmutable var whish is mutable:
+
+```rust
+use std::cell::RefCell;
+
+struct MockMessenger {
+    sent_messages: RefCell<Vec<String>>,
+}
+
+impl Messenger for MockMessenger {
+
+    // Now we can push on a &self
+    fn send(&self, message: &str) {
+        // borrow_mut() to have a "&mut var" which is a "RefMut<T>"
+        self.sent_messages.borrow_mut().push(String::from(message));
+    }
+}
+
+// Borrow() to have a "&var" which is a "Ref<T>"
+assert_eq!(mock_messenger.sent_messages.borrow().len(), 1);
+```
+
+`RefCell<T>`  lets us have many immutable borrows or one mutable borrow at any point in time. But we can change this with `Rc<RefCell<T>>`
+
+```rust
+enum List {
+    Cons(Rc<RefCell<i32>>, Rc<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+fn main() {
+    let value = Rc::new(RefCell::new(5));
+
+    // First use of value.
+    let a = Rc::new(
+        Cons(Rc::clone(&value), Rc::new(Nil))
+    );
+
+    // Second and thrid.
+    let b = Cons(Rc::new(RefCell::new(3)), Rc::clone(&a));
+    let c = Cons(Rc::new(RefCell::new(4)), Rc::clone(&a));
+
+    // We have multiple ref of &a and &value.
+    // But we can even mut &a.
+    *value.borrow_mut() += 10;
+}
+```
+
+### Reference Cycles Can Leak Memory
+
+A memory that it's nver clean when the rust program is finished. Because each variable are in a infinite reference cycle.
+
+```rust
+use crate::List::{Cons, Nil};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+#[derive(Debug)]
+enum List {
+
+    // RefCell to mut an imnmutable variable.
+    //
+    // Rc to have multiple ownership (of an immutable object).
+    // Rc to shared an variable "a" with other variables "b" and "c"
+    // without use a ref to "a".
+    //
+    // So we can:
+    Cons(i32, RefCell<Rc<List>>),
+    Nil,
+}
+
+impl List {
+    // To easily access to the second element.
+    fn tail(&self) -> Option<&RefCell<Rc<List>>> {
+        match self {
+            Cons(_, item) => Some(item),
+            Nil => None,
+        }
+    }
+}
+```
+
+```rust
+// b and c are list that use a.
+
+// "a" is on Rc<List> type, so we can have several List.
+// 5, Nil.
+let a = Rc::new(
+    Cons(5, RefCell::new(Rc::new(Nil)))
+);
+
+// 10, "a" (5, Nil)
+let b = Rc::new(
+    Cons(10, RefCell::new(Rc::clone(&a)))
+);
+
+// If the last elem in the Cons List 
+if let Some(link) = a.tail() {
+        *link.borrow_mut() = Rc::clone(&b);
+    }
+```
