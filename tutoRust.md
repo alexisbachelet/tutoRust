@@ -2135,7 +2135,7 @@ fn main() {
 
 ### Reference Cycles Can Leak Memory
 
-A memory that it's nver clean when the rust program is finished. Because each variable are in a infinite reference cycle.
+A memory that it's never clean when the rust program is finished. Because each variable are in a infinite reference cycle.
 
 ```rust
 use crate::List::{Cons, Nil};
@@ -2151,7 +2151,10 @@ enum List {
     // Rc to shared an variable "a" with other variables "b" and "c"
     // without use a ref to "a".
     //
-    // So we can:
+    // So we can share the access to List with other variables
+    // And we can change the List if we want.
+    // So "a" can be used in "b" or "c" and if we want we can replace "a" by "d"
+    // So now "b" and "c" share "d"
     Cons(i32, RefCell<Rc<List>>),
     Nil,
 }
@@ -2168,21 +2171,82 @@ impl List {
 ```
 
 ```rust
-// b and c are list that use a.
+// "a" is shared by "b".
 
-// "a" is on Rc<List> type, so we can have several List.
-// 5, Nil.
+// "a" is a Rc<List> type, so it can be used in another variable.
+// But inside of a it's:
+// Cons(5, RefCell(Rc(Nil)))
 let a = Rc::new(
     Cons(5, RefCell::new(Rc::new(Nil)))
 );
 
-// 10, "a" (5, Nil)
+// Cons(10, RefCell(Rc(&a)))
+// So "b" is link to "a"
 let b = Rc::new(
     Cons(10, RefCell::new(Rc::clone(&a)))
 );
 
-// If the last elem in the Cons List 
+// if let: to do some action if it's on good type.
+// "a.tail()" return a Some(RefCell(Rc(Nil)))
+// So we extract the some value on "link" variable: RefCell(Rc(Nil))
 if let Some(link) = a.tail() {
-        *link.borrow_mut() = Rc::clone(&b);
-    }
+    // borrow_mut() return a Rc(Nil)
+    // we change Rc(Nil) by Rc(&b)
+    // So "a" link to "b", but also "b" link to "a".
+    // It's an infinite loop.
+    *link.borrow_mut() = Rc::clone(&b);
+}
 ```
+
+Variable "a" and "b" are pointers so they have a *stack* part and on the *heap* part. When Rust finished to run, it drop varibale on a reverse order.  
+So "B" is drop with this stack part but the heap part still remain beacause "B" is still in use in "A".  
+Then "A" go out of scope, so heap part is clean but on the heap still remain because it' on "B" part.  
+So "A" and "B" are dropped but the heap part still remain because they reference to each others.
+ 
+We have an danger with `RefCell(Rc<T>)`. But if we use `Rc::downgrad` instead of `Rc::clone` we can avoid references cycles. Because weak references don't increase the strong count (the number of time a variable is shared). So for exemple when "B" go out of scope it will be dropped because it's now theorocally used in "A".
+
+To explain we are goin to create a tree:
+
+```rust
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+
+#[derive(Debug)]
+struct Node {
+    value: i32,
+
+    parent: RefCell<Weak<Node>>,
+
+    // A Node can have several children so xe use a Vec.
+    // A children can be use by other Node, so we need a Rc.
+    // RefCell to change the children of a node.
+    children: RefCell<Vec<Rc<Node>>>,
+}
+```
+
+In this exemple we can shared references but att the end Rust clean memory coorectly.
+
+```rust
+// The end node.
+let leaf = Rc::new(Node {
+    value: 3,
+    parent: RefCell::new(Weak::new())
+    children: RefCell::new(vec![]),  // No childrens.
+});
+
+// The begining node that hold "leaf".
+let branch = Rc::new(Node {
+    value: 5,
+    parent: RefCell::new(Weak::new()),
+    children: RefCell::new(vec![Rc::clone(&leaf)]),
+});
+
+// To return a Weak from a Rw we nned to call a downgrade.
+*leaf.parent.borrow_mut() = Rc::downgrade(&branch);
+
+// We need to upgrade a Weak reference to return a Some(Rc) to use it.
+// Because we are not sure the weak reference is still valid.
+// Because it can be already cleared. 1 
+println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
+```
+
