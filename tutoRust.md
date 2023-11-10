@@ -2190,7 +2190,8 @@ let b = Rc::new(
 // "a.tail()" return a Some(RefCell(Rc(Nil)))
 // So we extract the some value on "link" variable: RefCell(Rc(Nil))
 if let Some(link) = a.tail() {
-    // borrow_mut() return a Rc(Nil)
+        // borrow_mut() return a Rc(Nil)
+            // borrow_mut() return a Rc(Nil)
     // we change Rc(Nil) by Rc(&b)
     // So "a" link to "b", but also "b" link to "a".
     // It's an infinite loop.
@@ -2202,7 +2203,7 @@ Variable "a" and "b" are pointers so they have a *stack* part and on the *heap* 
 So "B" is drop with this stack part but the heap part still remain beacause "B" is still in use in "A".  
 Then "A" go out of scope, so heap part is clean but on the heap still remain because it' on "B" part.  
 So "A" and "B" are dropped but the heap part still remain because they reference to each others.
- 
+
 We have an danger with `RefCell(Rc<T>)`. But if we use `Rc::downgrad` instead of `Rc::clone` we can avoid references cycles. Because weak references don't increase the strong count (the number of time a variable is shared). So for exemple when "B" go out of scope it will be dropped because it's now theorocally used in "A".
 
 To explain we are goin to create a tree:
@@ -2249,4 +2250,3 @@ let branch = Rc::new(Node {
 // Because it can be already cleared. 1 
 println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
 ```
-
