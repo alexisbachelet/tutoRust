@@ -2135,7 +2135,7 @@ fn main() {
 
 ### Reference Cycles Can Leak Memory
 
-A memory that it's never clean when the rust program is finished. Because each variable are in a infinite reference cycle.
+A memory that it's nver clean when the rust program is finished. Because each variable are in a infinite reference cycle.
 
 ```rust
 use crate::List::{Cons, Nil};
@@ -2151,10 +2151,7 @@ enum List {
     // Rc to shared an variable "a" with other variables "b" and "c"
     // without use a ref to "a".
     //
-    // So we can share the access to List with other variables
-    // And we can change the List if we want.
-    // So "a" can be used in "b" or "c" and if we want we can replace "a" by "d"
-    // So now "b" and "c" share "d"
+    // So we can:
     Cons(i32, RefCell<Rc<List>>),
     Nil,
 }
@@ -2171,24 +2168,20 @@ impl List {
 ```
 
 ```rust
-// "a" is shared by "b".
+// b and c are list that use a.
 
-// "a" is a Rc<List> type, so it can be used in another variable.
-// But inside of a it's:
-// Cons(5, RefCell(Rc(Nil)))
+// "a" is on Rc<List> type, so we can have several List.
+// 5, Nil.
 let a = Rc::new(
     Cons(5, RefCell::new(Rc::new(Nil)))
 );
 
-// Cons(10, RefCell(Rc(&a)))
-// So "b" is link to "a"
+// 10, "a" (5, Nil)
 let b = Rc::new(
     Cons(10, RefCell::new(Rc::clone(&a)))
 );
 
-// if let: to do some action if it's on good type.
-// "a.tail()" return a Some(RefCell(Rc(Nil)))
-// So we extract the some value on "link" variable: RefCell(Rc(Nil))
+// If the last elem in the Cons List 
 if let Some(link) = a.tail() {
         // borrow_mut() return a Rc(Nil)
             // borrow_mut() return a Rc(Nil)
