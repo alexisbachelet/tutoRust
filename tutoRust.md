@@ -2151,7 +2151,8 @@ enum List {
     // Rc to shared an variable "a" with other variables "b" and "c"
     // without use a ref to "a".
     //
-    // So we can:
+    // So we if we want we can change the can change the List:
+    // We start with a reference to a variable "a" and after we can refer to "b"
     Cons(i32, RefCell<Rc<List>>),
     Nil,
 }
@@ -2183,8 +2184,7 @@ let b = Rc::new(
 
 // If the last elem in the Cons List 
 if let Some(link) = a.tail() {
-        // borrow_mut() return a Rc(Nil)
-            // borrow_mut() return a Rc(Nil)
+    // borrow_mut() return a Rc(Nil)
     // we change Rc(Nil) by Rc(&b)
     // So "a" link to "b", but also "b" link to "a".
     // It's an infinite loop.
@@ -2243,3 +2243,194 @@ let branch = Rc::new(Node {
 // Because it can be already cleared. 1 
 println!("leaf parent = {:?}", leaf.parent.borrow().upgrade());
 ```
+
+## Threads
+
+All the code it's executed in the same time.
+Important a thread always need to own it's varibale. So if we use an extern variriable we need to move it. So the thread take the ownership.
+
+```rust
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    // We handle thread.
+    // A closure always capture variable so we cannot use it after.
+    let handle = thread::spawn(move || {
+        println!("Here's a vector: {:?}", v);
+    });
+
+    // After the closure it's impossible to refer to v.
+    // V is only own by the closure.
+    // It's much more cautious because it's avoid the fact a var is
+    // used in a thread and in a another thear. If we exec the code
+    // we cannot be sure we have the same result.
+
+    handle.join().unwrap();  // Wait the thread is finished.
+}
+```
+
+We can link two thread by a chanel to sent data from one to another.  
+Multiple producer (sender) and a single consumer (receiver)
+
+```rust
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    // Because this thread use an external var (tx) we need to "move".
+    thread::spawn(move || {
+        let val = String::from("hi");
+
+        // Same logic here: we canno't use a sended value after
+        // It's to avoid interference (concurent code) bettwen thread.
+        // A "send" can fail if the recever is destroyed
+        // So we need to panick in this case.
+        tx.send(val).unwrap();
+    });
+
+    // Wait a message is sending, if "tx" is destroy "rx" panick.
+    let received = rx.recv().unwrap();  // wait a 
+    println!("Got: {}", received);
+}
+```
+
+Some improvement:
+
+```rust
+let (tx, rx) = mpsc::channel();
+let tx1 = tx.clone();  // We can clone it and use it in a second thread.
+
+// Shorcut to loop on all received values.
+for received in rx {
+        println!("Got: {}", received);
+    }
+```
+
+With message passing we can just send a value to one thread to an another.  
+But there is no real exchange. With mutex me chan share a value between several thread and each can change the value.
+
+Mutex is an abbreviation for mutual exclusion
+
+We need to lock the utew before use the data and release the lock.
+
+```rust
+use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        // Lock coulf fail if another thread holding the lock panicked.
+        // Also we need to unwrap the resultat to get the MutexGuard
+        // The gard hold the iner value (deref)
+        let mut num = m.lock().unwrap();
+        *num = 6;
+    }
+
+    println!("m = {:?}", m);
+}
+```
+
+In a real exemple:
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        // Atomic Rc: it's an Rc that can be share by many thread.
+        let counter = Arc::clone(&counter);
+
+        // Because we loop 10 time and at each time we make a move
+        // We need to put counter in a Rc, so we can use it several time.
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
+Some word to knowk usefull in tge debug mode:
+
+* *Send* to send the owernship bettewen thread.
+* *Sync* to share a reference between thread because they are all syncronues.  A type T is sync if it's ref &T is sent.
+
+## OOP
+
+Object-oriented programming (OOP)
+
+There is three main concepts:
+
+1. Object: data and method ; done with struct and impl
+1. Encapsulation: no data access directly ; use of pub ()
+1. Inheritance: use data or method from a parent object ; using default trait method implementations
+1. Polymorphism: code that can work with data of multiple types. Also with trait
+
+Exemple with an API to cretae A GUI.  
+We are going to define three struct that inherist from one commun class parent.
+
+We can use trait objects in place of a generic or concrete type.
+This works differently from defining a struct that uses a generic type parameter with trait bounds. **A generic type parameter can only be substituted with one concrete type at a time.** But here we want several type to be use.
+
+With genereic type: if we define a "Screen" struct, all the "components" need to be on the same type, so fo exemple "Button" or "TextField". But with "dyn" we can have on the same "Sreen" instance some button and textfield.
+
+```rust
+pub trait Draw {
+    fn draw(&self);
+}
+
+// On a screen there is several component.
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+
+// So with one method we cann sraw all of the components. 
+impl Screen {
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+```
+
+Exemple of a non dynamic way:
+
+```rust
+pub trait Draw {
+    fn draw(&self);
+}
+
+pub struct Screen<T: Draw> {
+    pub components: Vec<T>,
+}
+
+impl<T> Screen<T>
+where
+    T: Draw,
+{
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+```
+
+#### Implementing the Trait
