@@ -2433,4 +2433,304 @@ where
 }
 ```
 
-#### Implementing the Trait
+### Implementing the Trait
+
+```rust
+pub struct Button {
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button {
+    fn draw(&self) {
+        // code to actually draw a button
+    }
+}
+```
+
+Static: it's when the code is code is compiled ; Dynamic when the code check at runtime.
+
+```rust
+use gui::{Button, Screen};
+
+fn main() {
+    let screen = Screen {
+        components: vec![
+            Box::new(SelectBox {
+                width: 75,
+                height: 10,
+                options: vec![
+                    String::from("Yes"),
+                    String::from("Maybe"),
+                    String::from("No"),
+                ],
+            }),
+            Box::new(Button {
+                width: 50,
+                height: 10,
+                label: String::from("OK"),
+            }),
+        ],
+    };
+
+    screen.run();
+}
+```
+
+### Another exemple of POO with state object
+
+In the previous exemple we use trait (heritage) to share communs function bettwen struct. Each object are indepedent but link to each other. Now we are going to make POO in a **state** thinkings: an object that can evolve with time, like a workflow.
+
+This is the plan:
+
+* Create an empty post object
+* Add text
+* Ask for review
+* Approve the review to be published
+
+Here is an exemple of use:
+
+```rust
+use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+
+    post.add_text("I ate a salad for lunch today");
+    assert_eq!("", post.content());
+
+    post.request_review();
+    assert_eq!("", post.content());
+
+    post.approve();
+    assert_eq!("I ate a salad for lunch today", post.content());
+}
+```
+
+Before to go to the code of this POO state exemple. We need to view this:
+
+Focus on take:
+
+```rust
+let mut x = Some(2);
+let y = x.take();
+assert_eq!(x, None);
+assert_eq!(y, Some(2));
+```
+
+Focus on as_ref() convert `&Option<T>` to `Option<&T>`
+
+```rust
+pub struct Post {
+    // We use Box because Rust canno't know in adwence the size of "State".
+    // We use dyn because state are going to change type xith time.
+    // At the beging state is link to a struct that implemented the State trait.
+    // In a second time, state is link to an another struct.
+    state: Option<Box<dyn State>>,
+    content: String,
+}
+
+impl Post {
+// To create a new post.
+    pub fn new() -> Post {
+        Post {
+            state: Some(Box::new(Draft {})),
+            content: String::new(),
+        }
+    }
+
+    pub fn add_text(&mut self, text: &str) {
+        self.content.push_str(text);
+    }
+
+    pub fn content(&self) -> &str {
+        ""
+    }
+
+    // Go to the next state like a level up.
+    pub fn request_review(&mut self) {
+
+        // We can write:
+        // self.state = self.state.request_review();
+        // But we are not sure that request_review() will return a new state. 
+        // To be sag=fe we nned at 100% that the state value of state is destoy.
+
+        // So first we need to destroy the old state before to create a new.
+        // We use take() to take ownership of state.
+        // So state is destroy and Rust give a None value to State.
+        // But the destruction of state give it's value to "s".
+        if let Some(s) = self.state.take() {
+            // Request a review to change the state.
+            self.state = Some(s.request_review())
+        }
+    }
+
+    pub fn approve(&mut self) {
+        if let Some(s) = self.state.take() {
+            self.state = Some(s.approve())
+        }
+    }
+}
+
+// A trait is a collection of method share by structs.
+trait State {
+    // In a trait "self" stand for the struct that implemented the trait.
+    // But if a struct that implemented a trait is on a box so the box also
+    // have the trait implemented.
+    //
+    // Recall on state: Option<Box<dyn State>>
+    //
+    // "self: Box<Self>" this is mean we can only called this method when
+    // the type is in a Box. Not directly on the struct.
+    // the first self is "Box<Self>"
+    // the second is for the struct that implemented the trait.
+    fn request_review(self: Box<Self>) -> Box<dyn State>;
+
+    // Second method.
+    fn approve(self: Box<Self>) -> Box<dyn State>;
+}
+
+// FIrst State.
+struct Draft {}
+
+impl State for Draft {
+    // Just an implementation of the trait.
+    fn request_review(self: Box<Self>) -> Box<dyn State> {
+        Box::new(PendingReview {})  // CHange state.
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        // Do nothing because we cannot approve a draft before review it.
+        self
+    }
+}
+
+// Second state.
+struct PendingReview {}
+
+impl State for PendingReview {
+    // Because ask review on a already asked review must do nothing.
+    fn request_review(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        Box::new(Published {})
+    }
+}
+
+// Third State.
+struct Published {}
+
+impl State for Published {
+    fn request_review(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+}
+```
+
+To not be confusing, the next improvement of POO state are going to be view independently.
+
+```rust
+impl Post {
+    // The content display depend now of the state.
+    pub fn content(&self) -> &str {
+        // as_ref() to transform an Option<T> to Option<&T>
+        // unwrap to get &T
+        // so we call content on the real state instance.
+        self.state.as_ref().unwrap().content(self)
+    }
+}
+
+trait State {
+    fn content<'a>(&self, post: &'a Post) -> &'a str {
+        ""
+    }
+}
+
+impl State for Published {
+    fn content<'a>(&self, post: &'a Post) -> &'a str {
+        &post.content
+    }
+}
+```
+
+There is an another way of creating POO State. Because on the previous exemple there is so many duplication. For exemple we define a content method for each state even if it's not nesserary because we return an empty string.
+
+```rust
+// The final step.
+pub struct Post {
+    content: String,  // private attribute, so no one can access it.
+}
+
+// The first state.
+pub struct DraftPost {
+    content: String,
+}
+
+// The second state.
+pub struct PendingReviewPost {
+    content: String,
+}
+
+impl Post {
+    // When we create a Post in fact we create a draft instance.
+    pub fn new() -> DraftPost {
+        DraftPost {
+            content: String::new(),
+        }
+    }
+    
+    // We give the access to the content.
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
+impl DraftPost {
+    pub fn add_text(&mut self, text: &str) {
+        self.content.push_str(text);
+    }
+
+    // Change type.
+    pub fn request_review(self) -> PendingReviewPost {
+        PendingReviewPost {
+            content: self.content,
+        }
+    }
+}
+
+impl PendingReviewPost {
+    pub fn approve(self) -> Post {
+        Post {
+            content: self.content,
+        }
+    }
+}
+```
+
+it's much more easy but it's not totaly POO because the object change it's type with time. It's not encapasuled in a real object that never change.
+
+```rust
+use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+
+    post.add_text("I ate a salad for lunch today");
+
+    // we nned to redefine "post" so it's not fully POO.
+    let post = post.request_review();
+
+    let post = post.approve();
+
+    assert_eq!("I ate a salad for lunch today", post.content());
+}
+```
+
+## Pattern and Matching
