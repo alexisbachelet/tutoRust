@@ -2734,3 +2734,120 @@ fn main() {
 ```
 
 ## Pattern and Matching
+
+One of the most common error in pattern match happen xhen "matchtchig a named variable":
+
+```rust
+let x = Some(5);
+let y = 10;
+
+match x {
+    Some(50) | Some(20) => println!("Got 20 or 50"),
+    Some(1..=5) => println!("1 to 5 included"),
+    Some(y) => println!("Matched, y = {y}"),  // y is not 10 BUT all values.
+
+    // "_" match any value but not bind to the value
+    _ => println!("Default case, x = {:?}", x),
+}
+```
+
+Match  do not take owernship of the matched variable. SO we can use it after.
+
+Destructing a struct:
+
+```rust
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn main() {
+    let p = Point { x: 0, y: 7 };
+
+    let Point { x: a, y: b } = p;
+    assert_eq!(0, a);
+    assert_eq!(7, b);
+
+    // We can create two variable a end b for the value of w and y.
+    // But very often variables have the same name of the struct's field.
+    // So we do a thing like this:
+    // let Point { x: x, y: y } = p;
+    // There is a shortend:
+    // let Point { x, y } = p;
+}
+```
+
+So in a match we can use struct destruction (even work on enum destructure).
+
+```rust
+fn main() {
+    let p = Point { x: 0, y: 7 };
+
+    match p {
+        // All value of x and only if y = 0.
+        Point { x, y: 0 } => println!("On the x axis at {x}"),
+
+        // All value.
+        Point { x, y } => {
+            println!("On neither axis: ({x}, {y})");
+        }
+    }
+}
+```
+
+Ignoring an Unused Variable by Starting Its Name with _ to avoid warning.
+
+A quick way to ignore many value and only capture a specific part.
+
+```rust
+fn main() {
+    let numbers = (2, 4, 8, 16, 32);
+
+    match numbers {
+        (first, .., last) => {
+            println!("Some numbers: {first}, {last}");
+        }
+    }
+}
+```
+
+Match guard for more condition in a match:
+
+```rust
+let num = Some(4);
+
+match num {
+    Some(x) if x % 2 == 0 => println!("The number {} is even", x),
+    Some(x) => println!("The number {} is odd", x),
+    None => (),
+}
+```
+
+We cannot test and use a value without the at operator "@"
+
+```rust
+enum Message {
+    Hello { id: i32 },
+}
+
+let msg = Message::Hello { id: 5 };
+
+match msg {
+
+    Message::Hello { id: 1..=9 } => {
+        println!("Found 1 to 9")
+    }
+
+    // Here we test and we use the value after.
+    Message::Hello { id: id_variable @ 10..=100, } => {
+        println!("Found to 10 to 100: {}", id_variable)
+    }
+
+    // Is not really a test, it's like a default case.
+    // No mater of the id value: all are mapped on id.
+    // So we can use it after without @.
+    Message::Hello { id } => println!("Found some other id: {}", id),
+}
+```
+
+## Advenced feature
