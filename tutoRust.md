@@ -2851,3 +2851,134 @@ match msg {
 ```
 
 ## Advenced feature
+
+### Unsafe Rust
+
+Unsafe because the memory it's not checked at compile time.
+
+#### Dereferencing a Raw Pointer
+
+A new unsafe type exist (raw pointer) and it's similar to reference.
+Raw pointer are not smart pointer, there is here no rule or default behavior.
+
+```rust
+let mut num = 5;
+
+// "as" operator to convert a value to an another type.
+// An integer to a float generally.
+// Here we use "as" to create raw pointer.
+// *const and *mut: "*" is not here a deference but part of the type name.
+// We convert reference to raw pointer.
+let r1 = &num as *const i32;  // *cons for &
+let r2 = &mut num as *mut i32;  // *mut for &mut
+
+// We need to add unsafe to read or change data.
+// Because here we have in the same time a mutable and a immutable reference.
+// It's dangerous to read a thing that can be change by an another.
+unsafe {
+    println!("r1 is: {}", *r1);
+}
+```
+
+Very often raw pointer are used to extend references restrictions. For exemple it's impossible to have twice mutable reference of a value in the same time. But may be
+it's mandatory if we use two disstinc part. They never overlap on each other. So purely in theory we can have two mutale borrow but Rust doesn't allow us to do this. We need to use raw pointer.
+
+We denote a slice T by `[T]`
+
+```rust
+let mut v = vec![1, 2, 3, 4, 5, 6];
+let my_slice = &v[1..3];  // Inclusive so: 2, 3, 4.
+
+let r = &mut v[..];  // A slice of all elements.
+let (a, b) = r.split_at_mut(3);  // 3 is where we want to split. 
+assert_eq!(a, &mut [1, 2, 3]);
+assert_eq!(b, &mut [4, 5, 6]);
+```
+
+Recall:
+
+```rust
+let s: &str = "123";
+let ptr: *const u8 = s.as_ptr();
+
+unsafe {
+    println!("{}", *ptr as char);  // Return 1.
+
+    // Add is like an next.
+    println!("{}", *ptr.add(1) as char);  // Return 2.
+    println!("{}", *ptr.add(2) as char);  // Return 3.
+}
+```
+
+So we can define the real double mut references:
+
+```rust
+use std::slice;
+
+fn split_at_mut(values: &mut [i32], mid: usize) -> (&mut [i32], &mut [i32]) {
+    let len = values.len();
+    let ptr = values.as_mut_ptr();  // To return a raw pointer.
+
+    unsafe { 
+        // slice::from_raw_parts_mut create a slice from a raw pointer.
+        // First arg is a pointer and the second the slice lenght.
+        (
+            slice::from_raw_parts_mut(ptr, mid),
+            slice::from_raw_parts_mut(ptr.add(mid), len - mid),
+        )
+    }
+}
+```
+
+#### Static variable
+
+In rust global variable are called static.  
+All `static` variable have a `'static` lifetime.  
+A `'static` variable can be created during the code execution not mandory at the compile time.  
+We says static because the value is never destroy, the value is always available.  
+Static Vs Dynamic (classic rule of code execution)  
+Static variable are stored in a precise memory location.
+
+A static variable can be immutable or mutable.  
+Why chose an immutable static variable instead of a constant?  
+The difference is in memory: a static immutable variable is only stored in one place in the memory but constant can be duplicated if the compiler think it's much more quicker.
+
+Static variable are unsafed because a data race can appear. A read only thread access data in the same time of a write thread.
+
+```rust
+const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
+static mut COUNTER: u32 = 0;
+
+fn add_to_count(inc: u32) {
+    // Unssafe to write.
+    unsafe {
+        COUNTER += inc;
+    }
+}
+
+fn main() {
+    add_to_count(3);
+
+    // unsafe to read.
+    unsafe {
+        println!("COUNTER: {}", COUNTER);
+    }
+}
+```
+
+#### Unsafe trait
+
+To define and implemented an unsafe trait (like Sync or Send).
+
+* Send to send a value to an another thread (we send owernship)
+* Sync to receive a value from another thread (much like a reference)
+
+```rust
+unsafe trait Foo {
+    // methods go here
+}
+
+unsafe impl Foo for i32 {
+    // method implementations go here
+}
+```
