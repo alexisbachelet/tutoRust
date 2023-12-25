@@ -3118,29 +3118,47 @@ impl fmt::Display for Wrapper {
 
 ### Advenced types
 
-L'empty type
+#### Type alias
 
+```rust
+// We can define a type alais with type:
+type Thunk = Box<dyn Fn() + Send + 'static>;
+
+// It's usefull to avoid repetition.
+let f: Thunk = Box::new(|| println!("hi"));
+```
+
+
+#### Empty type
+
+For function that never return
+
+```rust
 fn bar() -> ! {
     // --snip--
 }
- 
-Functions that return never are called diverging functions
+```
 
-! Can be coerced to any type
-Continue to return on a top of the loop, great use in management of user error inputs. We loop untill ther eis no error any more
+an axample is `continue`:
 
-dynamically sized types DST
-For example "str" and not "&str" but "str"
+```rust
+// Here continue retun☺
+let guess: u32 = match guess.trim().parse() {
+    Ok(num) => num,
+    Err(_) => continue,  // Because we are inside a loop we can use continue.
+};
+```
 
-Rust needs to knon at the compile time how much memory to allocate for any valu
-So we can't crete a str in advance
-We need to use a reference
+#### Dynamically Sized Types
 
-For recall on a string slice :
-String slice stores the starting position and the length of the slice
-So it's only two data to store and we can compute this in advance it's like a pointer
+Rust needs to known at compile time how much memory to allocate for any value.  
+For example `str` and not `&str` but realy `str` is a Dinamiccaly Sized Type (DST).  
+So we can't create a `str` in advance. We need to use a reference
 
----
+String slice only store two value: The memory adress and the slice's lenght. So ith only two data we can have a fiwed size at the compile time. DST are alway behinf a pointer.
+
+### Advanced Functions and Closures
+
 Pass Function to function
 
 fn add_one(x: i32) -> i32 {
