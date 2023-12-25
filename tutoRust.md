@@ -2982,3 +2982,352 @@ unsafe impl Foo for i32 {
     // method implementations go here
 }
 ```
+
+###  Advanced Traits
+
+#### Placeholder Types
+
+In trait: Associated types are placeholder such that the trait method definitions can use these placeholder types in their signature
+
+We can do this:
+
+```rust
+pub trait Iterator<T> {
+
+    fn next(&mut self) -> Option<T>;
+}
+```
+
+But its better to do this:
+
+```rust
+pub trait Iterator {
+    type Item;
+
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+
+Because when we need to implement the trait to a struct we don't need to loop on each type of the iorator:
+
+* `impl Iterator<String> for Counter {}`
+* `impl Iterator<u32> for Counter {}`
+
+But directly (in one time and not two like above):
+ 
+ ```rust
+ impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // --snip--
+ ```
+    
+#### Default Generic Type Parameters
+
+But there is an other way. When we use a generic trait like `Iterator<T>` we don't need to implement him for each variant like `Iterator<String>` or `Iterator<u32>`. We can use a default type. For exemple with the Add trait of the standard library:
+
+```rust
+// This is a generic trait <T> but with a default type.
+trait Add<Rhs=Self> {  // Right Hand Side (like foo) because in add it's 2 arg.
+    type Output;
+
+    fn add(self, rhs: Rhs) -> Self::Output;
+}
+```
+
+```rust
+use std::ops::Add;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+// Here we dont specify `impl Add<Point> for Point` but just `impl Add for`.
+impl Add for Point {
+    type Output = Point;
+
+    fn add(self, other: Point) -> Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+```
+
+#### Fully Qualified Syntax for calling functions
+
+```rust
+impl Wizard for Human {
+    fn fly(&self) {
+        println!("Up!");
+    }
+}
+
+impl Human {
+    fn fly(&self) {
+        println!("*waving arms furiously*");
+    }
+}
+
+fn main() {
+    let person = Human;
+    Wizard::fly(&person);  // Bride for trait.
+    person.fly();  // Dot for struct.
+}
+```
+
+#### Using Supertraits to Require One Trait’s Functionality Within Another Trait
+
+Sometimes, you might write a trait definition that depends on another trait:
+
+For exemple the custom trait OutlinePrint need to use the trait Display. SO ti implment OutlinePrint on a struct we must altrady implmented the Display trait on the struct.
+
+```rust
+use std::fmt;
+
+trait OutlinePrint: fmt::Display {  // To say we need an another trait.
+    fn outline_print(&self) {
+        let output = self.to_string();  // to_string() come from Display.
+        println!("* {} *", output);
+    }
+}
+```
+
+#### Using the Newtype Pattern to Implement External Traits on External Types
+
+To implement a trait on one struct there is a rule. One of two (trait or struct) must be local (coded by ourself). So we are blocked when two are not local but come from an external crate. But there is a trick:
+
+Creating a new type in a tuple struct
+
+```rust
+use std::fmt;
+
+struct Wrapper(Vec<String>);
+
+// Here we implment Display (public) on Vec(Public)
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+```
+
+### Advenced types
+
+L'empty type
+
+fn bar() -> ! {
+    // --snip--
+}
+ 
+Functions that return never are called diverging functions
+
+! Can be coerced to any type
+Continue to return on a top of the loop, great use in management of user error inputs. We loop untill ther eis no error any more
+
+dynamically sized types DST
+For example "str" and not "&str" but "str"
+
+Rust needs to knon at the compile time how much memory to allocate for any valu
+So we can't crete a str in advance
+We need to use a reference
+
+For recall on a string slice :
+String slice stores the starting position and the length of the slice
+So it's only two data to store and we can compute this in advance it's like a pointer
+
+---
+Pass Function to function
+
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+    f(arg) + f(arg)
+}
+
+fn main() {
+    let answer = do_twice(add_one, 5);
+
+    println!("The answer is: {}", answer);
+}
+
+
+---
+Tu peux mapper indiferament due des closures comme.sur des fonctions
+
+Un exemple de pur mapping avec des fonctions. Pour creer en masse tous les Status::Value dans un range de 0 à 20 :
+
+enum Status {
+        Value(u32),
+        Stop,
+    }
+
+    let list_of_statuses: Vec<Status> = (0u32..20).map(Status::Value).collect();
+
+
+
+
+    let list_of_numbers = vec![1, 2, 3];
+    let list_of_strings: Vec<String> =
+        list_of_numbers.iter().map(|i| i.to_string()).collect();
+
+
+
+     let list_of_numbers = vec![1, 2, 3];
+    let list_of_strings: Vec<String> =
+        list_of_numbers.iter().map(ToString::to_string).collect();
+
+
+
+---
+Macro are part of metaprogramming, code that write code
+
+Derive to write quickly very common code 
+
+A same Macro can take a various number of arguments and even argument can change of type between call
+It's very generic
+
+Les macros don't difficiles à écrires
+
+Macro are compute in first before the rest of the code
+
+we must  define a macro before use it
+But a function can be first call and then define. There is no rela order in a function, the compiler reorder for us (try it)
+
+Macro are very generic
+
+A) declarative macro
+Comme un regex des inputs
+
+#[macro_export] to tell we can use the macro  in other crate
+
+It's like a match expression
+( $( $x:expr ),* )
+( ) // To encompass the pattern matching
+
+$() like in batch to exec code
+Here we capture input and map them to value
+
+$x:espr To march any rust expression
+
+Et le * pour dire qu'on répète cette sorte de regex
+Comme ça ça marche avec un [1, 2]
+Point important le * ne s'applique pas comme un regex à seulement la virgule 
+
+
+B) procedural macro
+Ici on a pas un regex en entré mais plutôt directement du code qui est transformé. Comme en python avec le @ décorateur qui vient modifier (souvent pour ajouter) le code
+
+Il y en a de trois type :
+custom derive, attribute-like, and function-like
+
+B)1) custom derive
+#[derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
+Ce trait à une fonction associée hello_macro
+
+First step, create a new library crate :
+cargo new hello_macro --lib
+
+Then inside the hello_macro folder :
+cargo new hello_macro_derive --lib
+
+
+We set this new crate as procedural and set up the dependencies
+hello_macro_derive/Cargo.toml
+[lib]
+proc-macro = true
+[dependencies]
+syn = "1.0"
+quote = "1.0"
+
+We need to specify dependency because they are not inxlude by default in Rust
+Syn to convert from a string to a code object
+Quote to convert from a code object to a string
+
+Ident : identifier meaning the struct's name where the trait is implemented
+
+ B)2) attribute macro
+It's like custom derive but instead of using derive we can set our own attribute (decorator)
+
+#[route(GET, "/")]
+fn index() {
+
+Here we add code the index function by using the route attribute with two parameters
+
+B)C) function like macro
+
+---
+Les annexes
+All the "dérives" we can do :
+* Debug to : print all the field from a struxt by {:?} 
+• PartialEq : to compare two stuct if they have all the same field so they are equal
+Il faudrait faire un focus sur entre le partielEq et le eq
+• PartialOrd
+• clone pour faire.la.xopiz parfaite
+• copy pour juste copier le pointeur et pas l'intégralité des données
+
+
+It's useful to use 
+$ rustup component add rustfmt
+To quickly reformat code and everybody use that tool so there is no question of which format to use with this paradigme
+
+Then we can
+$ cargo fmt
+
+If we have a bug at compile time or a warning. We can use :
+$ cargo fix
+To quickly apply the recommended fix
+
+
+This component is here to tell of to improve our code to avoid common mistake
+$ rustup component add clippy
+$ cargo clippy
+
+
+It's recommended to use 
+Rust analyser plugin fo vs code
+
+---
+Des peotocol pour transmettre des messages entre un serveur et un client
+Le TCP et l'HTTP, le TCP c'est comment envoyé de l'info (route) et l'HTTP c'est plus une codification de l'information (le message en lui même)
+
+cargo new hello
+cd hello
+
+connecting to a port to listen to is known as “binding to a port"
+
+Incoming return all connexion (stream = flux de données) between the serveur and the client
+
+Un navigateur fait souvent plusieurs requête. Toujours le chargement du contenu de la page et aussi par exemple la fav icon
+Il est donc normal d'avoir plusieurs un message de connexion
+
+Cargo run
+Puis control c pour quitter
+
+In computer science, a data buffer (or just buffer) is a region of a memory used to store data temporarily while it is being moved from one place to another
+
+The variable "http_request" is here to collect all the lines of the request
+Vec<_> Rust compiler, infer what type goes into the Vec
+The lines method returns an iterator
+
+The browser signals the end of an HTTP request by sending two newline characters in a row
+So we must stop at the first empty row line
+
+Focus on :
+"GET / HTTP/1.1"
+
+CRLF stands for carriage return and line feed
+After the request line, all the remaining tmline are part of header because a GET requests have no body
+
+As_bytes() to.xo'vert a string to an array of numbers
+
+Une idée importante de refactoring
+Est d'utiliser un if pour affecter co ditonelleme t une variable puis d'utiliser la variable après
+Par exemple en ouvrant spécifiant le chemin d'un fichier. 
+
