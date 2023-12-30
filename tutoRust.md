@@ -2983,7 +2983,7 @@ unsafe impl Foo for i32 {
 }
 ```
 
-###  Advanced Traits
+### Advanced Traits
 
 #### Placeholder Types
 
@@ -3014,7 +3014,7 @@ Because when we need to implement the trait to a struct we don't need to loop on
 * `impl Iterator<u32> for Counter {}`
 
 But directly (in one time and not two like above):
- 
+
  ```rust
  impl Iterator for Counter {
     type Item = u32;
@@ -3022,7 +3022,7 @@ But directly (in one time and not two like above):
     fn next(&mut self) -> Option<Self::Item> {
         // --snip--
  ```
-    
+
 #### Default Generic Type Parameters
 
 But there is an other way. When we use a generic trait like `Iterator<T>` we don't need to implement him for each variant like `Iterator<String>` or `Iterator<u32>`. We can use a default type. For exemple with the Add trait of the standard library:
@@ -3128,7 +3128,6 @@ type Thunk = Box<dyn Fn() + Send + 'static>;
 let f: Thunk = Box::new(|| println!("hi"));
 ```
 
-
 #### Empty type
 
 For function that never return
@@ -3159,8 +3158,9 @@ String slice only store two value: The memory adress and the slice's lenght. So 
 
 ### Advanced Functions and Closures
 
-Pass Function to function
+To pass a function to a function we just nedd to use the `fn` keyword.
 
+```rust
 fn add_one(x: i32) -> i32 {
     x + 1
 }
@@ -3171,59 +3171,46 @@ fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
 
 fn main() {
     let answer = do_twice(add_one, 5);
+    println!("The answer is: {}", answer);  // Return 12.
+}
+```
 
-    println!("The answer is: {}", answer);
+A function can also be used at the closure's place.  
+One exemple to use a function instead of a closure is for creating all `Status::Value` in a range of 0 to 20:
+
+```rust
+enum Status {
+    Value(u32),
+    Stop,
 }
 
+// Map to apply a function on a iterator and return an interator too.
+// Here we don't write the double parenthesis of Status::Value()
+// But it's cretae in a range of 0 to 20 all Status.
+let list_of_statuses: Vec<Status> = (0u32..20).map(Status::Value).collect();
+```
 
----
-Tu peux mapper indiferament due des closures comme.sur des fonctions
+```rust
+let list_of_numbers = vec![1, 2, 3];
+let list_of_strings: Vec<String> =
+list_of_numbers.iter().map(|i| i.to_string()).collect();
 
-Un exemple de pur mapping avec des fonctions. Pour creer en masse tous les Status::Value dans un range de 0 à 20 :
+let list_of_numbers = vec![1, 2, 3];
+let list_of_strings: Vec<String> =
+list_of_numbers.iter().map(ToString::to_string).collect();
+```
 
-enum Status {
-        Value(u32),
-        Stop,
-    }
+### Macros
 
-    let list_of_statuses: Vec<Status> = (0u32..20).map(Status::Value).collect();
+Macro are part of metaprogramming: code that write code. One of the most used feature of macro are `derive`. Derive to imlemented quickly a trait to a struct. The second big feature of macro it's the various number of arguments and types that can takes. Macro are very generic but diffucult to write.
 
+We must  define a macro before use it instead of a function that can be first call and then define. There is three type of macros.
 
+#### Declarative macro
 
-
-    let list_of_numbers = vec![1, 2, 3];
-    let list_of_strings: Vec<String> =
-        list_of_numbers.iter().map(|i| i.to_string()).collect();
-
-
-
-     let list_of_numbers = vec![1, 2, 3];
-    let list_of_strings: Vec<String> =
-        list_of_numbers.iter().map(ToString::to_string).collect();
-
-
-
----
-Macro are part of metaprogramming, code that write code
-
-Derive to write quickly very common code 
-
-A same Macro can take a various number of arguments and even argument can change of type between call
-It's very generic
-
-Les macros don't difficiles à écrires
-
-Macro are compute in first before the rest of the code
-
-we must  define a macro before use it
-But a function can be first call and then define. There is no rela order in a function, the compiler reorder for us (try it)
-
-Macro are very generic
-
-A) declarative macro
 Comme un regex des inputs
 
-#[macro_export] to tell we can use the macro  in other crate
+a# [macro_export] to tell we can use the macro  in other crate
 
 It's like a match expression
 ( $( $x:expr ),* )
@@ -3234,10 +3221,9 @@ Here we capture input and map them to value
 
 $x:espr To march any rust expression
 
-Et le * pour dire qu'on répète cette sorte de regex
+Et le *pour dire qu'on répète cette sorte de regex
 Comme ça ça marche avec un [1, 2]
-Point important le * ne s'applique pas comme un regex à seulement la virgule 
-
+Point important le* ne s'applique pas comme un regex à seulement la virgule
 
 B) procedural macro
 Ici on a pas un regex en entré mais plutôt directement du code qui est transformé. Comme en python avec le @ décorateur qui vient modifier (souvent pour ajouter) le code
@@ -3246,7 +3232,9 @@ Il y en a de trois type :
 custom derive, attribute-like, and function-like
 
 B)1) custom derive
-#[derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
+
+# [derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
+
 Ce trait à une fonction associée hello_macro
 
 First step, create a new library crate :
@@ -3254,7 +3242,6 @@ cargo new hello_macro --lib
 
 Then inside the hello_macro folder :
 cargo new hello_macro_derive --lib
-
 
 We set this new crate as procedural and set up the dependencies
 hello_macro_derive/Cargo.toml
@@ -3273,7 +3260,8 @@ Ident : identifier meaning the struct's name where the trait is implemented
  B)2) attribute macro
 It's like custom derive but instead of using derive we can set our own attribute (decorator)
 
-#[route(GET, "/")]
+# [route(GET, "/")]
+
 fn index() {
 
 Here we add code the index function by using the route attribute with two parameters
@@ -3283,15 +3271,15 @@ B)C) function like macro
 ---
 Les annexes
 All the "dérives" we can do :
-* Debug to : print all the field from a struxt by {:?} 
+
+* Debug to : print all the field from a struxt by {:?}
 • PartialEq : to compare two stuct if they have all the same field so they are equal
 Il faudrait faire un focus sur entre le partielEq et le eq
 • PartialOrd
 • clone pour faire.la.xopiz parfaite
 • copy pour juste copier le pointeur et pas l'intégralité des données
 
-
-It's useful to use 
+It's useful to use
 $ rustup component add rustfmt
 To quickly reformat code and everybody use that tool so there is no question of which format to use with this paradigme
 
@@ -3302,13 +3290,11 @@ If we have a bug at compile time or a warning. We can use :
 $ cargo fix
 To quickly apply the recommended fix
 
-
 This component is here to tell of to improve our code to avoid common mistake
 $ rustup component add clippy
 $ cargo clippy
 
-
-It's recommended to use 
+It's recommended to use
 Rust analyser plugin fo vs code
 
 ---
@@ -3347,5 +3333,4 @@ As_bytes() to.xo'vert a string to an array of numbers
 
 Une idée importante de refactoring
 Est d'utiliser un if pour affecter co ditonelleme t une variable puis d'utiliser la variable après
-Par exemple en ouvrant spécifiant le chemin d'un fichier. 
-
+Par exemple en ouvrant spécifiant le chemin d'un fichier.
