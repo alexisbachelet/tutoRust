@@ -3202,38 +3202,73 @@ list_of_numbers.iter().map(ToString::to_string).collect();
 
 ### Macros
 
-Macro are part of metaprogramming: code that write code. One of the most used feature of macro are `derive`. Derive to imlemented quickly a trait to a struct. The second big feature of macro it's the various number of arguments and types that can takes. Macro are very generic but diffucult to write.
+Macro are part of metaprogramming: code that write another code. One of the most used feature of macro are `derive`. Derive to imlemented quickly a trait to a struct. The second big feature of macro it's the various number of arguments and types that can takes instead of functions. Macro are very generic but diffucult to write.
 
 We must  define a macro before use it instead of a function that can be first call and then define. There is three type of macros.
 
 #### Declarative macro
 
-Comme un regex des inputs
+Declarative macro are like functions but much more generic. They are like a rgegex on inputs.
 
-a# [macro_export] to tell we can use the macro  in other crate
+For the example we rewite the `vec![1, 2, 3]` macro:
 
-It's like a match expression
-( $( $x:expr ),* )
-( ) // To encompass the pattern matching
+```rust
+let v: Vec<u32> = vec![1, 2, 3];
+```
 
-$() like in batch to exec code
-Here we capture input and map them to value
+Go deeper:
 
-$x:espr To march any rust expression
+```rust
+#[macro_export]  // Tell at the compiler to use this macro in other crate.
+macro_rules! vec {
+    ( $( $x:expr ),* ) => {
+        {
+            let mut temp_vec = Vec::new();
+            $(
+                temp_vec.push($x);
+            )*
+            temp_vec
+        }
+    };
+}
+```
 
-Et le *pour dire qu'on répète cette sorte de regex
-Comme ça ça marche avec un [1, 2]
-Point important le* ne s'applique pas comme un regex à seulement la virgule
+We focus now on : `( $( $x:expr ),* )`  it's like a match expression:
 
-B) procedural macro
+* First we used `( )` to encompass the pattern matching
+* `$()` to tell we are going to make a repetition
+* `$x:expr` to march any rust expression
+* `,*` to tell we can have optionaly a comma between arguments
+
+So we can match one and two of `[1, 2]`
+
+Then in the body of the function `$()*` will be applt for each match in `$()`. SO here it's like to exec this code:
+
+```rust
+{
+    let mut temp_vec = Vec::new();
+    temp_vec.push(1);
+    temp_vec.push(2);
+    temp_vec.push(3);
+    temp_vec
+}
+```
+
+```bash
+# So $() in Rust is for repetition and for exec cmd like in Bash.
+echo "Today is $(date). A fine day."
+```
+
+#### procedural macro
+
 Ici on a pas un regex en entré mais plutôt directement du code qui est transformé. Comme en python avec le @ décorateur qui vient modifier (souvent pour ajouter) le code
 
 Il y en a de trois type :
 custom derive, attribute-like, and function-like
 
-B)1) custom derive
+##### Custom derive
 
-# [derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
+a# [derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
 
 Ce trait à une fonction associée hello_macro
 
