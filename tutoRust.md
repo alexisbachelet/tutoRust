@@ -3208,7 +3208,7 @@ We must  define a macro before use it instead of a function that can be first ca
 
 #### Declarative macro
 
-Declarative macro are like functions but much more generic. They are like a rgegex on inputs.
+Declarative macro are like functions but much more generic. They are like a rgegex on inputs. We said declrative because we tell to the macro what to do.
 
 For the example we rewite the `vec![1, 2, 3]` macro:
 
@@ -3259,80 +3259,172 @@ Then in the body of the function `$()*` will be applt for each match in `$()`. S
 echo "Today is $(date). A fine day."
 ```
 
-#### procedural macro
+#### Procedural macro
 
-Ici on a pas un regex en entré mais plutôt directement du code qui est transformé. Comme en python avec le @ décorateur qui vient modifier (souvent pour ajouter) le code
+It's not like previously with flexible function (macro). Here is like in Python with decorator. We can add a `#` to overwrite a function. We cann add quickly some special purpose like a timer. Here is not **declarative**, we can't realy now in adwance what happen. Because we always add a feature on a external function it's **procedural**.
 
-Il y en a de trois type :
-custom derive, attribute-like, and function-like
+There is thee type of procedural macro: custom derive, attribute-like, and function-like.
 
-##### Custom derive
+##### Custom derive trait
 
-a# [derive(HelloMacro)]. // Comme ça tu peux facilement ajouter le trait HelloMacro à n'importe quelle struct
+Custom derive to quickly implement a trait on our structs.
 
-Ce trait à une fonction associée hello_macro
+In this exemple we are going to define a trait and it's derivation to quickly implement them on every struct we want.
 
-First step, create a new library crate :
+First step: create a new library crate to define our trait:
+
+```bash
 cargo new hello_macro --lib
+```
 
-Then inside the hello_macro folder :
+```rust
+// src/lib.rs
+pub trait HelloMacro {
+    fn hello_macro();
+}
+```
+
+Then inside the hello_macro folder, define the derivation:
+
+```bash
 cargo new hello_macro_derive --lib
+```
 
-We set this new crate as procedural and set up the dependencies
-hello_macro_derive/Cargo.toml
+Then we set up this new crate as procedural and define dependencies:
+
+```toml
+# hello_macro_derive/Cargo.toml
 [lib]
 proc-macro = true
+
 [dependencies]
-syn = "1.0"
-quote = "1.0"
+syn = "1.0"  # For rewrite code.
+quote = "1.0"  # For returning a TokenStream.
+```
 
-We need to specify dependency because they are not inxlude by default in Rust
-Syn to convert from a string to a code object
-Quote to convert from a code object to a string
+We need to specify dependency because they are not included by default in Rust. We nedd to download these external crate on **crate.io**. Automatically done by cargo.
+We used `Syn` to convert code into a handle object and `Quote` to do the reverse.
 
-Ident : identifier meaning the struct's name where the trait is implemented
+```rust
+// hello_macro_derive/src/lib.rs
+use proc_macro::TokenStream;
+use quote::quote;
+use syn;
 
- B)2) attribute macro
-It's like custom derive but instead of using derive we can set our own attribute (decorator)
+#[proc_macro_derive(HelloMacro)]
+pub fn hello_macro_derive(input: TokenStream) -> TokenStream {
+    // Construct a representation of Rust code as a syntax tree
+    // that we can manipulate
+    let ast = syn::parse(input).unwrap();
 
-# [route(GET, "/")]
+    // Build the trait implementation
+    impl_hello_macro(&ast)
+}
 
-fn index() {
+fn impl_hello_macro(ast: &syn::DeriveInput) -> TokenStream {
+    // "ident" for identifier (it's the struct name).
+    let name = &ast.ident;
+    let gen = quote! {
+        impl HelloMacro for #name {
+            fn hello_macro() {
+                println!("Hello, Macro! My name is {}!", stringify!(#name));
+            }
+        }
+    };
+    gen.into()
+}
+```
 
-Here we add code the index function by using the route attribute with two parameters
+`stringify` for convert an expression suc as `1 + 1` to a string `"1 + 1"`
 
-B)C) function like macro
+Then we can used our crate. First in a another different folder.
 
----
-Les annexes
-All the "dérives" we can do :
+```bash
+cargo new myProject
+```
 
-* Debug to : print all the field from a struxt by {:?}
-• PartialEq : to compare two stuct if they have all the same field so they are equal
-Il faudrait faire un focus sur entre le partielEq et le eq
-• PartialOrd
-• clone pour faire.la.xopiz parfaite
-• copy pour juste copier le pointeur et pas l'intégralité des données
+```toml
+# path dependencies: to used our custom crate if it's not published on crate.io
+hello_macro = { path = "../hello_macro" }
+hello_macro_derive = { path = "../hello_macro/hello_macro_derive" }
+```
 
-It's useful to use
-$ rustup component add rustfmt
-To quickly reformat code and everybody use that tool so there is no question of which format to use with this paradigme
+```rust
+use hello_macro::HelloMacro;
+use hello_macro_derive::HelloMacro;
 
-Then we can
-$ cargo fmt
+#[derive(HelloMacro)]
+struct Pancakes;
 
-If we have a bug at compile time or a warning. We can use :
-$ cargo fix
-To quickly apply the recommended fix
+fn main() {
+    Pancakes::hello_macro();
+}
+```
 
-This component is here to tell of to improve our code to avoid common mistake
-$ rustup component add clippy
-$ cargo clippy
+##### Attribute like macro
+
+It's like to do a derivetion but more generaly. (decorator)
+
+```rust
+// SImple deriviation.
+#[derive(HelloMacro)]
+struct Panckes;
+
+// Like this we can change any function we want (like a decorator).
+#[route(GET, "/")]
+fn index() {}
+```
+
+It can be define like this:
+
+```rust
+// attr for attribut = GET, "/"
+// item = fn index() {}
+#[proc_macro_attribute]
+pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {}
+```
+
+##### Function like macro
+
+Take a TokenStream in input and do some struff on it.
+
+```rust
+#[proc_macro]
+pub fn sql(input: TokenStream) -> TokenStream {
+
+
+let sql = sql!(SELECT * FROM posts WHERE id=1);
+```
+
+## Les annexes
+
+All the "dérives" we can do:
+
+* **Debug to:** print all the field from a struct with `{:?}`
+* **PartialEq:** test if two struct have all of their fields equal `==`. We say `PartialEq` for Partial Equivalence
+* **PartialOrd** to test if `<`
+* **clone** pour faire.la.xopiz parfaite
+* **copy** pour juste copier le pointeur et pas l'intégralité des données
+
+```bash
+# To quicky reformat our code:
+rustup component add rustfmt
+cargo fmt
+```
+
+If we have a bug at compile time or a warning. We can use `cargo fix` to quickly apply the recommended fix.
+
+```bash
+# clippy tell of to imporove youtr code and avoid common mistakese
+rustup component add clippy
+cargo clippy
+```
 
 It's recommended to use
 Rust analyser plugin fo vs code
 
----
+## Multitgread web server
+
 Des peotocol pour transmettre des messages entre un serveur et un client
 Le TCP et l'HTTP, le TCP c'est comment envoyé de l'info (route) et l'HTTP c'est plus une codification de l'information (le message en lui même)
 
