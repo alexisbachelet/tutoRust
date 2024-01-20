@@ -3425,39 +3425,385 @@ Rust analyser plugin fo vs code
 
 ## Multitgread web server
 
-Des peotocol pour transmettre des messages entre un serveur et un client
-Le TCP et l'HTTP, le TCP c'est comment envoyé de l'info (route) et l'HTTP c'est plus une codification de l'information (le message en lui même)
+### Single Web Server
 
+We use protocol to transmit message bettwen a client and a serveur.
+There is TCP (low level) and HTTP (hifgh level) and HTTP is make of TCP.
+
+```bash
 cargo new hello
 cd hello
+```
 
-connecting to a port to listen to is known as “binding to a port"
+```rust
+use std::net::TcpListener;
 
-Incoming return all connexion (stream = flux de données) between the serveur and the client
+fn main() {
+    // Listen to a port is call "binding a port".
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
-Un navigateur fait souvent plusieurs requête. Toujours le chargement du contenu de la page et aussi par exemple la fav icon
-Il est donc normal d'avoir plusieurs un message de connexion
+    // each conexion of the client to the serveur are called stream
+    // stream for a datastream
+    // one Browser often make serveral call
+    // 1 the page, 2 the favicon for example.
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
 
-Cargo run
-Puis control c pour quitter
+        println!("Connection established!");
+    }
+}
+```
 
-In computer science, a data buffer (or just buffer) is a region of a memory used to store data temporarily while it is being moved from one place to another
+```bash
+Cargo run  # Then a ctrl-c to cancel the serveur.
+```
 
-The variable "http_request" is here to collect all the lines of the request
-Vec<_> Rust compiler, infer what type goes into the Vec
-The lines method returns an iterator
+In computer science a data buffer (or just buffer) is a region of a memory used to store data temporarily while it is being moved from one place to another.
 
-The browser signals the end of an HTTP request by sending two newline characters in a row
-So we must stop at the first empty row line
+```rust
+use std::{
+    fs,
+    io::{prelude::*, BufReader},
+    net::{TcpListener, TcpStream},
+};
 
-Focus on :
-"GET / HTTP/1.1"
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
-CRLF stands for carriage return and line feed
-After the request line, all the remaining tmline are part of header because a GET requests have no body
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
 
-As_bytes() to.xo'vert a string to an array of numbers
+        handle_connection(stream);
+    }
+}
 
-Une idée importante de refactoring
-Est d'utiliser un if pour affecter co ditonelleme t une variable puis d'utiliser la variable après
-Par exemple en ouvrant spécifiant le chemin d'un fichier.
+fn handle_connection(mut stream: TcpStream) {
+    let buf_reader = BufReader::new(&mut stream);  // Buffer have line().
+    // First next is to have the real first line. (1 is empty here)
+    let request_line = buf_reader.lines().next().unwrap().unwrap();
+
+    let (status_line, filename) = if request_line == "GET / HTTP/1.1" {
+        ("HTTP/1.1 200 OK", "hello.html")
+    } else {
+        ("HTTP/1.1 404 NOT FOUND", "404.html")
+    };
+
+    let contents = fs::read_to_string(filename).unwrap();
+    let length = contents.len();
+
+    let response =
+        format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
+
+    // as_bytes() to transform a letter on a digit.
+    stream.write_all(response.as_bytes()).unwrap();
+}
+```
+
+An `HTTP request` is always like this but a `GET` have no body:
+
+```HTTP
+Method Request-URI HTTP-Version CRLF
+headers CRLF
+message-body
+```
+
+An `HTTP answer` is like this:
+
+```HTTP
+HTTP-Version Status-Code Reason-Phrase CRLF
+headers CRLF
+message-body
+```
+
+One important trisk is to use a if to double define new variables and then use it to take data from files.
+
+### Multi thread
+
+For now we can only serv one client at a time. We need to use thread to handle multiple xonnexion at the time. But we cannot create a thread for each connexion it can lead to DOS attack (Denial of Service). Wa can have simultaneously N thread with:
+
+* Thread pool
+* Fork/join model
+* Single-threaded async I/O model
+* Multi-threaded async I/O model
+
+First we are going to implement the easy way:
+
+```rust
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    // It can be DoS.
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+
+        // In the loop stream is reseat at each iteration. So we can use it.
+        thread::spawn(|| {
+            handle_connection(stream);
+        });
+    }
+}
+```
+
+But now to avoid DoS we are going to build a thread pool (only for example 8 threat at the time). We want our API (interface) to be use by the user like this:
+
+```rust
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(4);
+
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+
+        pool.execute(|| {
+            handle_connection(stream);
+        });
+    }
+}
+```
+
+```rust
+// JoinHandle is a Thread that can be joined i.e. wait that the code end.
+pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    where
+        F: FnOnce() -> T,  // FnOnce to only exec one time the function f.
+        F: Send + 'static,  // Send to transfer ownership between thread.
+        T: Send + 'static,  // Static lifetime for always awailable value.
+```
+
+Static stand here for owned and no referenced value:
+
+```rust
+// To better undertstand the 'static trait bound.
+// It means the type does not contain any non-static references.
+use std::fmt::Debug;
+
+fn print_it( input: impl Debug + 'static ) {
+    println!("'static value passed in is: {:?}", input);
+}
+
+fn main() {
+    // i is owned and contains no references, thus it's 'static:
+    let i = 5;
+    print_it(i);
+
+    // oops, &i only has the lifetime defined by the scope of
+    // main(), so it's not 'static:
+    print_it(&i);
+}
+```
+
+It's important to understand the differences between new and build:
+
+* `New` return a full type that can be failed at the creation
+* `Build` return a `Result<T, E>` so it never failed at the creation but the result it's uncertain
+
+One more recall is handle is the name of a variable that hold a thread:
+
+```rust
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..5 {
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    // We wait that the trait handle is finish to end the main.
+    handle.join().unwrap();
+}
+```
+
+Recall on sender and receiver:
+
+```rust
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();  // Created before thread.
+
+    thread::spawn(move || {
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+    });
+
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);
+}
+```
+
+With all these recall we can now continue the course:
+
+```rust
+use std::{sync::mpsc, thread};
+
+pub struct ThreadPool {
+    workers: Vec<Worker>,
+    sender: mpsc::Sender<Job>,
+}
+
+struct Job;
+
+impl ThreadPool {
+    pub fn new(size: usize) -> ThreadPool {
+        assert!(size > 0);
+
+        let (sender, receiver) = mpsc::channel();
+
+        let mut workers = Vec::with_capacity(size);
+
+        // It's a bug, we cannot use receiver more than once !!!
+        for id in 0..size {
+            workers.push(Worker::new(id, receiver));
+        }
+
+        ThreadPool { workers, sender }
+    }
+
+    pub fn execute<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        // Do nothing.
+    }
+}
+
+
+struct Worker {
+    id: usize,
+    thread: thread::JoinHandle<()>,
+}
+
+impl Worker {
+    fn new(id: usize, receiver: mpsc::Receiver<Job>) -> Worker {
+        let thread = thread::spawn(|| {
+            receiver;
+        });
+
+        Worker { id, thread }
+    }
+}
+```
+
+Because `receiver` is mpsc (multi producor single consumer(receiver)) we cannot copy the receiver. We need to use `Mutex<T>` and `Arc`. Before to see that we need some recall:
+
+```rust
+// Mutex allow access to data from one thread at a time.
+// It's avoid thread concurency.
+// Mutex for Mutual Exclusion.
+use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        let mut num = m.lock().unwrap();
+        *num = 6;
+    }
+
+    println!("m = {:?}", m);
+}
+```
+
+`Arc` stand for atomic `Rc` and atomic is the most basic thing like an read or wite.
+Atomic operation are imediatly do, there is no time for execution.
+
+So we can swith too:
+
+```rust
+// Arc<Mutex<T>>
+// Arc type allow multiple owner.
+// Mutex to only exec T at a time. No thread concurency, mutual exclusion.
+let receiver = Arc::new(Mutex::new(receiver));
+
+let mut workers = Vec::with_capacity(size);
+
+for id in 0..size {
+    workers.push(Worker::new(id, Arc::clone(&receiver)));
+}
+```
+
+Next we need to wite our exec method:
+
+```rust
+// Explanations are below to understand why we used a Bow and a dyn.
+type Job = Box<dyn FnOnce() + Send + 'static>;
+
+impl ThreadPool {
+
+    pub fn execute<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let job = Box::new(f);
+        self.sender.send(job).unwrap();
+    }
+}
+```
+
+First why we used a box? Because we used a function.  
+`fn` type is called a function pointer. To use function inside another function:
+
+```rust
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+    f(arg) + f(arg)
+}
+```
+
+Firstly, xe need to use a box because function (and also closure) are considered like trait.
+Trait are a collection of method that at struct can implemented.  
+**Trait can never be returned** because rust need to have a fiwed size at compile time.
+Here we send so we return thereof we need to boxed our send.
+
+Secondly why we used a `dyn`?  
+Because Rust is a typed language and he need to kwnow at a compile time which type is going to be used. And here we ruturn a trait (function) and is not a type.
+We used `dyn` to be dynamic
+
+Recall:  
+We write an old API to store grpahic elements
+
+```rust
+pub trait Draw {
+    fn draw(&self);
+}
+
+// Like this we can use dynamic type.
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+```
+
+Thirdly we used `static` to have owned value and static references.
+
+```rust
+impl Worker {
+
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+
+        // Loop to halways exec the Job.
+        let thread = thread::spawn(move || loop {
+            let job = receiver.lock().unwrap().recv().unwrap();
+
+            println!("Worker {id} got a job; executing.");
+
+            job();
+        });
+
+        Worker { id, thread }
+    }
+}
+```
+
+### Cleanup
